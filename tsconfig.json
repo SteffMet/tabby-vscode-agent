@@ -3,6 +3,8 @@
   "exclude": ["node_modules", "dist"],
   "noImplicitReturns": true,
   "compilerOptions": {
-    "baseUrl": "src"
+    "baseUrl": "src",
+    "noUnusedLocals": false,
+    "noUnusedParameters": false
   }
 }

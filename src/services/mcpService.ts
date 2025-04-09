@@ -9,6 +9,7 @@ import express, { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from 'zod';
+import { IncomingMessage, ServerResponse } from 'http';
 
 /**
  * The main MCP server service for Tabby
@@ -80,27 +81,30 @@ export class McpService {
       res.status(200).send('OK');
     });
 
-    // to support multiple simultaneous connections we have a lookup object from
-    // sessionId to transport
-    const transports: {[sessionId: string]: SSEServerTransport} = {};
+    this.app.get("/sse", async (req: Request, res: Response) => {
+      console.log("Establishing new SSE connection");
+      const transport = new SSEServerTransport(
+        "/messages",
+        res as unknown as ServerResponse<IncomingMessage>,
+      );
+      console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
 
-    this.app.get("/sse", async (_: Request, res: Response) => {
-      const transport = new SSEServerTransport('/messages', res);
-      transports[transport.sessionId] = transport;
+      this.transports[transport.sessionId] = transport;
       res.on("close", () => {
-        delete transports[transport.sessionId];
+        delete this.transports[transport.sessionId];
       });
+
       await this.server.connect(transport);
     });
 
     this.app.post("/messages", async (req: Request, res: Response) => {
       const sessionId = req.query.sessionId as string;
-      const transport = transports[sessionId];
-      if (transport) {
-        await transport.handlePostMessage(req, res);
-      } else {
-        res.status(400).send('No transport found for sessionId');
+      if (!this.transports[sessionId]) {
+        res.status(400).send(`No transport found for sessionId ${sessionId}`);
+        return;
       }
+      console.log(`Received message for sessionId ${sessionId}`);
+      await this.transports[sessionId].handlePostMessage(req, res);
     });
   }
 

@@ -49,12 +49,13 @@ export interface McpResponse {
 /**
  * Success response helper
  */
-export function createSuccessResponse(text: string): McpResponse {
+export function createSuccessResponse(text: string, metadata?: Record<string, any>): McpResponse {
   return {
     content: [{
       type: "text",
       text
-    }]
+    }],
+    metadata
   };
 }
 

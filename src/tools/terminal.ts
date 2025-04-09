@@ -6,6 +6,7 @@ import { McpTool, createErrorResponse, createJsonResponse, createSuccessResponse
 import * as z from 'zod';
 import stripAnsi from 'strip-ansi';
 import { SerializeAddon } from '@xterm/addon-serialize';
+import { BehaviorSubject } from 'rxjs';
 
 /**
  * Interface for terminal tab component with ID
@@ -16,12 +17,31 @@ interface BaseTerminalTabComponentWithId {
 }
 
 /**
+ * Interface for tracking active command
+ */
+interface ActiveCommand {
+  tabId: number;
+  command: string;
+  timestamp: number;
+  startMarker: string;
+  endMarker: string;
+  abort: () => void;
+}
+
+/**
  * Terminal execution tool category
  * Provides tools for terminal commands execution and SSH session management
  */
 @Injectable({ providedIn: 'root' })
 export class ExecToolCategory extends BaseToolCategory {
   name: string = 'exec';
+  
+  // Track active command execution
+  private _activeCommand: ActiveCommand | null = null;
+  private _activeCommandSubject = new BehaviorSubject<ActiveCommand | null>(null);
+  
+  // Observable for UI to subscribe to
+  public readonly activeCommand$ = this._activeCommandSubject.asObservable();
 
   constructor(private app: AppService) {
     super();
@@ -35,6 +55,35 @@ export class ExecToolCategory extends BaseToolCategory {
     this.registerTool(this.getSshSessionList());
     this.registerTool(this.execCommand());
     this.registerTool(this.getTerminalBuffer());
+    this.registerTool(this.abortCommand());
+  }
+
+  /**
+   * Get current active command
+   */
+  public get activeCommand(): ActiveCommand | null {
+    return this._activeCommand;
+  }
+
+  /**
+   * Set active command and notify subscribers
+   */
+  private setActiveCommand(command: ActiveCommand | null): void {
+    this._activeCommand = command;
+    this._activeCommandSubject.next(command);
+    console.log(`[DEBUG] Active command updated: ${command ? command.command : 'none'}`);
+  }
+
+  /**
+   * Abort the current command if any
+   */
+  public abortCurrentCommand(): void {
+    if (this._activeCommand) {
+      this._activeCommand.abort();
+      this._activeCommand = null;
+      this._activeCommandSubject.next(null);
+      console.log(`[DEBUG] Command aborted by user`);
+    }
   }
 
   /**
@@ -85,11 +134,34 @@ export class ExecToolCategory extends BaseToolCategory {
   }
 
   /**
+   * Abort the current command
+   */
+  private abortCommand(): McpTool<any> {
+    return {
+      name: 'abort_command',
+      description: 'Abort the currently running command',
+      schema: undefined,
+      handler: async (_, extra) => {
+        if (!this._activeCommand) {
+          return createErrorResponse('No command is currently running');
+        }
+        
+        try {
+          this.abortCurrentCommand();
+          return createSuccessResponse('Command aborted successfully');
+        } catch (err) {
+          console.error(`[DEBUG] Error aborting command:`, err);
+          return createErrorResponse(`Failed to abort command: ${err.message || err}`);
+        }
+      }
+    };
+  }
+
+  /**
    * Execute a command in a terminal
    * Schema:
    * - command: string (required) - The command to execute
    * - tabId: string (optional) - The ID of the tab to execute in, defaults to active tab
-   * - timeout: number (optional) - Milliseconds to wait for command completion, default 1000
    */
   private execCommand(): McpTool<any> {
     return {
@@ -97,14 +169,12 @@ export class ExecToolCategory extends BaseToolCategory {
       description: 'Execute a command in a terminal session and return the output',
       schema: {
         command: z.string().describe('Command to execute in the terminal'),
-        tabId: z.string().optional().describe('Tab ID to execute in, get from get_ssh_session_list'),
-        timeout: z.number().optional().describe('Milliseconds to wait for command completion, default 1000')
+        tabId: z.string().optional().describe('Tab ID to execute in, get from get_ssh_session_list')
       },
       handler: async (params, extra) => {
         const {
           command,
-          tabId,
-          timeout = 1000
+          tabId
         } = params;
 
         const sessions = this.findAndSerializeTerminalSessions();
@@ -114,99 +184,195 @@ export class ExecToolCategory extends BaseToolCategory {
           return createErrorResponse('Invalid tab ID');
         }
 
-        console.log(`[DEBUG] Execute command: ${command}, tabIndex: ${session.id}, timeout: ${timeout}`);
+        console.log(`[DEBUG] Execute command: ${command}, tabIndex: ${session.id}`);
+
+        // Check if another command is already running
+        if (this._activeCommand) {
+          return createErrorResponse('Another command is already running. Abort it first.');
+        }
 
         try {
-          // Prepare command with marker for output tracking
+          // Setup shell hooks
           const timestamp = Date.now();
           const startMarker = `TABBY_OUTPUT_START_${timestamp}`;
-          const wrappedCommand = `echo '${startMarker}' && ${command}`;
+          const endMarker = `TABBY_OUTPUT_END_${timestamp}`;
+          let exitCode: number | null = null;
 
-          console.log(`[DEBUG] Executing wrapped command: ${wrappedCommand}`);
+          // Create abort controller for this command
+          let aborted = false;
+          const abortHandler = () => {
+            aborted = true;
+          };
 
-          // Execute the command
-          session.tab.sendInput(wrappedCommand + "\r");
+          // Set active command
+          this.setActiveCommand({
+            tabId: session.id,
+            command,
+            timestamp,
+            startMarker,
+            endMarker,
+            abort: abortHandler
+          });
 
-          // Wait for command to complete
-          console.log(`[DEBUG] Waiting ${timeout}ms for command to complete...`);
-          await new Promise<void>(resolve => setTimeout(resolve, timeout));
-          console.log(`[DEBUG] Wait completed`);
+          // Setup: Encode scripts as base64 to avoid issues with shell special characters
+          const setupScriptContent = `
+function __tabby_post_command() {
+  local exit_code=$?
+  if [[ $(history | tail -n 1 | awk '{$1=""; sub(/^ /, ""); print}') == 'echo "${startMarker}"'* ]]; then
+    echo "${endMarker}"
+    echo "exit_code: $exit_code"
+  fi
+}
+trap - DEBUG 2>/dev/null
+[ -n "$PROMPT_COMMAND" ] && PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g') 2>/dev/null
+[ -n "$preexec_functions" ] && preexec_functions=() 2>/dev/null
+[ -n "$precmd_functions" ] && precmd_functions=() 2>/dev/null
+if [ -n "$BASH_VERSION" ]; then
+  PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"
+elif [ -n "$ZSH_VERSION" ]; then
+  precmd_functions=(__tabby_post_command)
+else
+  OLD_PS1="$PS1"
+  PS1='$(__tabby_post_command)'$PS1
+fi
+`;
+          
+          // Cleanup script
+          const cleanupScriptContent = `
+trap - DEBUG 2>/dev/null
+[ -n "$PROMPT_COMMAND" ] && PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g') 2>/dev/null
+if [ -n "$OLD_PS1" ]; then
+  PS1="$OLD_PS1"
+  unset OLD_PS1
+fi
+unset __tabby_post_command
+`;
 
-          // Get terminal buffer content
-          let textAfter = "";
-          if (session.tab.frontend instanceof XTermFrontend) {
-            if (!session.tab.frontend.xterm['_serializeAddon']) {
-              const addon = new SerializeAddon();
-              session.tab.frontend.xterm.loadAddon(addon);
-              session.tab.frontend.xterm['_serializeAddon'] = addon; // lưu lại nếu cần dùng nhiều lần
-              console.log('✅ SerializeAddon loaded');
-            }
-            textAfter = session.tab.frontend.xterm['_serializeAddon'].serialize();
-            
-            console.log(`[DEBUG] Buffer text after (length: ${textAfter.length})`);
-          }
-
-          // Extract command output from buffer
+          // Execute setup (in silent mode)
+          session.tab.sendInput(setupScriptContent);
+          // session.tab.sendInput(cleanupScriptContent);
+          
+          session.tab.sendInput(`echo "${startMarker}" && ${command}\n`);
+          
+          // Wait for command output
           let output = '';
-          if (textAfter) {
-            // Clean ANSI codes for easier parsing
+          let commandStarted = false;
+          let commandFinished = false;
+          
+          while (!commandFinished && !aborted) {
+            await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
+            
+            // Get terminal buffer
+            let textAfter = "";
+            if (session.tab.frontend instanceof XTermFrontend) {
+              if (!session.tab.frontend.xterm['_serializeAddon']) {
+                const addon = new SerializeAddon();
+                session.tab.frontend.xterm.loadAddon(addon);
+                session.tab.frontend.xterm['_serializeAddon'] = addon;
+              }
+              textAfter = session.tab.frontend.xterm['_serializeAddon'].serialize();
+            }
+
+            // Clean ANSI codes and process output
             const cleanTextAfter = stripAnsi(textAfter);
             const lines = cleanTextAfter.split('\n');
 
-            // Find the marker line
-            let markerLineIndex = -1;
-            for (let i = 0; i < lines.length; i++) {
-              if (lines[i].includes(startMarker)) {
-                markerLineIndex = i;
+            // Find start and end markers
+            let startIndex = -1;
+            let endIndex = -1;
+
+            for (let i = lines.length - 1; i >= 0; i--) {
+              console.log(`[DEBUG] lines[i]: ${lines[i]}`);
+              if (lines[i].startsWith(startMarker)) {
+                startIndex = i;
+                commandStarted = true;
+                for (let j = startIndex + 1; j < lines.length; j++) {
+                  if (lines[j].startsWith(endMarker)) {
+                    endIndex = j;
+                    commandFinished = true;
+                    break;
+                  }
+                }
                 break;
               }
             }
 
-            // Extract output after marker, but before prompt
-            if (markerLineIndex !== -1 && markerLineIndex < lines.length - 1) {
-              // Extract all lines after the marker
-              const remainingLines = lines.slice(markerLineIndex + 1);
-              
-              // Find the command output (between marker and next prompt)
-              let commandOutput: string[] = [];
-              let insideOutput = true;
-              
-              for (let i = 0; i < remainingLines.length; i++) {
-                const line = remainingLines[i].trim();
-                
-                // Skip the first empty lines after the marker
-                if (commandOutput.length === 0 && line === '') {
-                  continue;
-                }
-                
-                // Stop extracting when we detect a prompt pattern
-                if (line.includes('#') || line.includes('$') || line.includes('>')) {
-                  // Only consider it a prompt if it's at the end of a line with username/hostname pattern
-                  if (line.match(/[@:].*[#$>](\s*)$/)) {
-                    insideOutput = false;
-                    break;
-                  }
-                }
-                
-                if (insideOutput) {
-                  commandOutput.push(line);
-                }
+            console.log(`[DEBUG] startIndex: ${startIndex}, endIndex: ${endIndex}`);
+
+            // Extract output between markers
+            if (commandStarted && commandFinished && startIndex !== -1 && endIndex !== -1) {
+              const commandOutput = lines.slice(startIndex + 1, endIndex)
+                .filter(line => !line.includes(startMarker) && !line.includes(endMarker))
+                .join('\n')
+                .trim();
+              output = commandOutput;
+              try {
+                exitCode = parseInt(lines[endIndex+1].split(':')[1].trim());
+              } catch (err) {
+                console.error(`[DEBUG] Error parsing exit code:`, err);
               }
-              
-              output = commandOutput.join('\n').trim().replace(startMarker, '');
-              console.log(`[DEBUG] Found marker at line ${markerLineIndex}, extracted command output: "${output}"`);
-            } else {
-              // Fallback: use entire buffer if marker not found
-              output = cleanTextAfter;
-              console.log(`[DEBUG] Could not find marker or it was the last line, using entire buffer`);
+              break;
+            }
+
+            // Timeout after 30 seconds
+            if (Date.now() - timestamp > 30000) {
+              throw new Error('Command execution timed out after 30 seconds');
             }
           }
 
+          // Cleanup hooks
+
+          session.tab.sendInput(cleanupScriptContent);
+
+          // Clear active command
+          this.setActiveCommand(null);
+
+          // If aborted, get buffer from marker to end
+          if (aborted) {
+            console.log(`[DEBUG] Command was aborted, retrieving partial output`);
+            
+            let textAfter = "";
+            if (session.tab.frontend instanceof XTermFrontend) {
+              if (!session.tab.frontend.xterm['_serializeAddon']) {
+                const addon = new SerializeAddon();
+                session.tab.frontend.xterm.loadAddon(addon);
+                session.tab.frontend.xterm['_serializeAddon'] = addon;
+              }
+              textAfter = session.tab.frontend.xterm['_serializeAddon'].serialize();
+            }
+
+            const cleanTextAfter = stripAnsi(textAfter);
+            const lines = cleanTextAfter.split('\n');
+            
+            // Find start marker
+            let startIndex = -1;
+            for (let i = 0; i < lines.length; i++) {
+              if (lines[i].includes(startMarker)) {
+                startIndex = i;
+                break;
+              }
+            }
+            
+            if (startIndex !== -1) {
+              // Get everything from start marker to end
+              output = lines.slice(startIndex + 1)
+                .filter(line => !line.includes(startMarker))
+                .join('\n')
+                .trim();
+            } else {
+              // If no start marker found, return whole buffer
+              output = cleanTextAfter;
+            }
+            
+            return createSuccessResponse(output, { aborted: true, exitCode });
+          }
+
           console.log(`[DEBUG] Command executed: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
-          
-          return createSuccessResponse(output);
+          return createSuccessResponse(output, );
         } catch (err) {
           console.error(`[DEBUG] Error capturing command output:`, err);
+          // Clear active command on error
+          this.setActiveCommand(null);
           return createErrorResponse(`Failed to capture command output in session ${session.id} (${session.tab.title}): ${err.message || err}`);
         }
       }

@@ -1,9 +1,11 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import TabbyCoreModule from 'tabby-core';
+import TabbyCoreModule, { ToolbarButtonProvider } from 'tabby-core';
 import { McpService } from './services/mcpService';
 // import { TabToolCategory } from './tools/tab';
 import { ExecToolCategory } from './tools/terminal';
+import { ExecCommandButtonComponent } from './components/execCommandButton.component';
+import { McpToolbarButtonProvider } from './toolbarButtonProvider';
 
 /**
  * Module for the MCP server integration
@@ -16,8 +18,15 @@ import { ExecToolCategory } from './tools/terminal';
   providers: [
     McpService,
     // TabToolCategory,
-    ExecToolCategory
+    ExecToolCategory,
+    { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true }
   ],
+  declarations: [
+    ExecCommandButtonComponent
+  ],
+  exports: [
+    ExecCommandButtonComponent
+  ]
 })
 export default class McpModule {
   /**

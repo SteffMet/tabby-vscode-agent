@@ -43,6 +43,12 @@ export class ExecToolCategory extends BaseToolCategory {
   // Observable for UI to subscribe to
   public readonly activeCommand$ = this._activeCommandSubject.asObservable();
 
+  // Shell type definitions
+  private readonly SHELL_TYPE_BASH = 'bash';
+  private readonly SHELL_TYPE_ZSH = 'zsh';
+  private readonly SHELL_TYPE_SH = 'sh';
+  private readonly SHELL_TYPE_UNKNOWN = 'unknown';
+
   constructor(private app: AppService) {
     super();
     
@@ -84,6 +90,30 @@ export class ExecToolCategory extends BaseToolCategory {
       this._activeCommandSubject.next(null);
       console.log(`[DEBUG] Command aborted by user`);
     }
+  }
+
+  /**
+   * Abort the current command
+   */
+  private abortCommand(): McpTool<any> {
+    return {
+      name: 'abort_command',
+      description: 'Abort the currently running command',
+      schema: undefined,
+      handler: async (_, extra) => {
+        if (!this._activeCommand) {
+          return createErrorResponse('No command is currently running');
+        }
+        
+        try {
+          this.abortCurrentCommand();
+          return createSuccessResponse('Command aborted successfully');
+        } catch (err) {
+          console.error(`[DEBUG] Error aborting command:`, err);
+          return createErrorResponse(`Failed to abort command: ${err.message || err}`);
+        }
+      }
+    };
   }
 
   /**
@@ -134,27 +164,240 @@ export class ExecToolCategory extends BaseToolCategory {
   }
 
   /**
-   * Abort the current command
+   * Generate shell detection script
+   * @returns Shell detection script
    */
-  private abortCommand(): McpTool<any> {
-    return {
-      name: 'abort_command',
-      description: 'Abort the currently running command',
-      schema: undefined,
-      handler: async (_, extra) => {
-        if (!this._activeCommand) {
-          return createErrorResponse('No command is currently running');
-        }
-        
-        try {
-          this.abortCurrentCommand();
-          return createSuccessResponse('Command aborted successfully');
-        } catch (err) {
-          console.error(`[DEBUG] Error aborting command:`, err);
-          return createErrorResponse(`Failed to abort command: ${err.message || err}`);
-        }
+  private getShellDetectionScript(): string {
+    return `
+# More reliable shell detection
+if [ -n "$BASH_VERSION" ]; then
+  echo "SHELL_TYPE=${this.SHELL_TYPE_BASH}"
+elif [ -n "$ZSH_VERSION" ]; then
+  echo "SHELL_TYPE=${this.SHELL_TYPE_ZSH}"
+# Check if we're running in sh (more ways to detect)
+elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then
+  echo "SHELL_TYPE=${this.SHELL_TYPE_SH}"
+else
+  echo "SHELL_TYPE=${this.SHELL_TYPE_UNKNOWN}"
+fi
+`;
+  }
+
+  /**
+   * Detect shell type from terminal output
+   * @param terminalOutput The terminal output containing shell type
+   * @returns The detected shell type
+   */
+  private detectShellType(terminalOutput: string): string {
+    const lines = stripAnsi(terminalOutput).split('\n');
+    for (let i = lines.length - 1; i >= 0; i--) {
+      const line = lines[i];
+      if (line.startsWith('SHELL_TYPE=')) {
+        // Trim any whitespace or special characters
+        const shellType = line.split('=')[1].trim();
+        console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
+        return shellType;
       }
-    };
+    }
+    return this.SHELL_TYPE_UNKNOWN;
+  }
+
+  /**
+   * Get shell setup script for Bash
+   * @param startMarker The start marker for command tracking
+   * @param endMarker The end marker for command tracking
+   * @returns Bash-specific setup script
+   */
+  private getBashSetupScript(startMarker: string, endMarker: string): string {
+    return `
+# Bash-specific setup
+__TABBY_MARKER_EMITTED=0
+
+function __tabby_post_command() {
+  # Only execute if we haven't emitted the marker yet
+  if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then
+    local exit_code=$?
+    local last_cmd=$(HISTTIMEFORMAT='' history 1 | awk '{$1=""; print substr($0,2)}')
+    if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then
+      # Set the flag to prevent further executions
+      __TABBY_MARKER_EMITTED=1
+      echo "${endMarker}"
+      echo "exit_code: $exit_code"
+    fi
+  fi
+}
+
+# Clean any existing hooks
+trap - DEBUG 2>/dev/null
+PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g')
+
+# Setup the new hook
+PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"
+`;
+  }
+
+  /**
+   * Get shell setup script for Zsh
+   * @param startMarker The start marker for command tracking
+   * @param endMarker The end marker for command tracking
+   * @returns Zsh-specific setup script
+   */
+  private getZshSetupScript(startMarker: string, endMarker: string): string {
+    return `
+# Zsh-specific setup
+function __tabby_post_command() {
+  local exit_code=$?
+  local last_cmd=$(fc -ln -1)
+  if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then
+    echo "${endMarker}"
+    echo "exit_code: $exit_code"
+  fi
+}
+
+# Clean any existing hooks
+precmd_functions=()
+
+# Setup the new hook
+precmd_functions=(__tabby_post_command)
+`;
+  }
+
+  /**
+   * Get shell setup script for generic POSIX shell
+   * @param startMarker The start marker for command tracking
+   * @param endMarker The end marker for command tracking
+   * @returns POSIX sh-specific setup script
+   */
+  private getShSetupScript(startMarker: string, endMarker: string): string {
+    return `
+# Generic sh setup - POSIX compatible
+# Create a flag file for tracking command execution
+__TABBY_CMD_FLAG="/tmp/tabby_cmd_$$"
+
+# Define post command function using POSIX-compatible syntax
+__tabby_post_command() {
+  local exit_code=$?
+  if [ -f "$__TABBY_CMD_FLAG" ]; then
+    echo "${endMarker}"
+    echo "exit_code: $exit_code"
+    rm -f "$__TABBY_CMD_FLAG" 2>/dev/null
+  fi
+}
+
+# Save old PS1 if we need to restore it
+OLD_PS1="$PS1"
+
+# Set up new PS1 with our hook
+PS1='$(__tabby_post_command)'$PS1
+`;
+  }
+
+  /**
+   * Get shell cleanup script for Bash
+   * @returns Bash-specific cleanup script
+   */
+  private getBashCleanupScript(): string {
+    return `
+# Bash cleanup
+trap - DEBUG 2>/dev/null
+PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g')
+unset __tabby_post_command
+unset __TABBY_MARKER_EMITTED
+`;
+  }
+
+  /**
+   * Get shell cleanup script for Zsh
+   * @returns Zsh-specific cleanup script
+   */
+  private getZshCleanupScript(): string {
+    return `
+# Zsh cleanup
+precmd_functions=()
+unset __tabby_post_command
+`;
+  }
+
+  /**
+   * Get shell cleanup script for generic POSIX shell
+   * @returns POSIX sh-specific cleanup script
+   */
+  private getShCleanupScript(): string {
+    return `
+# Sh cleanup - POSIX compatible
+if [ -n "$OLD_PS1" ]; then
+  PS1="$OLD_PS1"
+  unset OLD_PS1
+fi
+unset __tabby_post_command
+# Remove the flag file if it exists
+rm -f "$__TABBY_CMD_FLAG" 2>/dev/null
+unset __TABBY_CMD_FLAG
+`;
+  }
+
+  /**
+   * Get the appropriate scripts for a specific shell type
+   * @param shellType The detected shell type
+   * @param startMarker The start marker for command tracking
+   * @param endMarker The end marker for command tracking
+   * @returns Object containing setup script, cleanup script, and command prefix
+   */
+  private getShellScripts(shellType: string, startMarker: string, endMarker: string): { 
+    setupScript: string; 
+    cleanupScript: string; 
+    commandPrefix: string;
+  } {
+    // Normalize the shell type by trimming and converting to lowercase
+    const normalizedShellType = shellType.trim().toLowerCase();
+    
+    // Log actual values for debugging
+    console.log(`[DEBUG] Normalized shell type: "${normalizedShellType}"`);
+    console.log(`[DEBUG] SHELL_TYPE_BASH constant: "${this.SHELL_TYPE_BASH}"`);
+    console.log(`[DEBUG] SHELL_TYPE_ZSH constant: "${this.SHELL_TYPE_ZSH}"`);
+    
+    // Use if/else instead of switch for more explicit string comparison
+    if (normalizedShellType === this.SHELL_TYPE_BASH) {
+      console.log(`[DEBUG] Selected shell script: bash`);
+      return {
+        setupScript: this.getBashSetupScript(startMarker, endMarker),
+        cleanupScript: this.getBashCleanupScript(),
+        commandPrefix: ''
+      };
+    } else if (normalizedShellType === this.SHELL_TYPE_ZSH) {
+      console.log(`[DEBUG] Selected shell script: zsh`);
+      return {
+        setupScript: this.getZshSetupScript(startMarker, endMarker),
+        cleanupScript: this.getZshCleanupScript(),
+        commandPrefix: ''
+      };
+    } else {
+      console.log(`[DEBUG] Selected shell script: default (sh)`);
+      return {
+        setupScript: this.getShSetupScript(startMarker, endMarker),
+        cleanupScript: this.getShCleanupScript(),
+        // For sh, we create the flag file right before running the command
+        commandPrefix: 'touch "$__TABBY_CMD_FLAG" && '
+      };
+    }
+  }
+
+  /**
+   * Get terminal buffer content as text
+   * @param session The terminal session
+   * @returns The terminal buffer content as text
+   */
+  private getTerminalBufferText(session: BaseTerminalTabComponentWithId): string {
+    let bufferText = "";
+    if (session.tab.frontend instanceof XTermFrontend) {
+      if (!session.tab.frontend.xterm['_serializeAddon']) {
+        const addon = new SerializeAddon();
+        session.tab.frontend.xterm.loadAddon(addon);
+        session.tab.frontend.xterm['_serializeAddon'] = addon;
+      }
+      bufferText = session.tab.frontend.xterm['_serializeAddon'].serialize();
+    }
+    return bufferText;
   }
 
   /**
@@ -192,7 +435,7 @@ export class ExecToolCategory extends BaseToolCategory {
         }
 
         try {
-          // Setup shell hooks
+          // Create timestamp and markers first
           const timestamp = Date.now();
           const startMarker = `TABBY_OUTPUT_START_${timestamp}`;
           const endMarker = `TABBY_OUTPUT_END_${timestamp}`;
@@ -214,45 +457,31 @@ export class ExecToolCategory extends BaseToolCategory {
             abort: abortHandler
           });
 
-          // Setup: Encode scripts as base64 to avoid issues with shell special characters
-          const setupScriptContent = `
-function __tabby_post_command() {
-  local exit_code=$?
-  if [[ $(history | tail -n 1 | awk '{$1=""; sub(/^ /, ""); print}') == 'echo "${startMarker}"'* ]]; then
-    echo "${endMarker}"
-    echo "exit_code: $exit_code"
-  fi
-}
-trap - DEBUG 2>/dev/null
-[ -n "$PROMPT_COMMAND" ] && PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g') 2>/dev/null
-[ -n "$preexec_functions" ] && preexec_functions=() 2>/dev/null
-[ -n "$precmd_functions" ] && precmd_functions=() 2>/dev/null
-if [ -n "$BASH_VERSION" ]; then
-  PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"
-elif [ -n "$ZSH_VERSION" ]; then
-  precmd_functions=(__tabby_post_command)
-else
-  OLD_PS1="$PS1"
-  PS1='$(__tabby_post_command)'$PS1
-fi
-`;
+          // First determine which shell we're running in
+          const detectShellScript = this.getShellDetectionScript();
           
-          // Cleanup script
-          const cleanupScriptContent = `
-trap - DEBUG 2>/dev/null
-[ -n "$PROMPT_COMMAND" ] && PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g') 2>/dev/null
-if [ -n "$OLD_PS1" ]; then
-  PS1="$OLD_PS1"
-  unset OLD_PS1
-fi
-unset __tabby_post_command
-`;
-
-          // Execute setup (in silent mode)
-          session.tab.sendInput(setupScriptContent);
-          // session.tab.sendInput(cleanupScriptContent);
+          // Send the detection script
+          session.tab.sendInput(detectShellScript);
           
-          session.tab.sendInput(`echo "${startMarker}" && ${command}\n`);
+          // Wait a moment for the shell type to be detected
+          await new Promise(resolve => setTimeout(resolve, 100));
+          
+          // Get terminal buffer to check shell type
+          const textBeforeSetup = this.getTerminalBufferText(session);
+          
+          // Determine shell type from output
+          const shellType = this.detectShellType(textBeforeSetup);
+          console.log(`[DEBUG] Detected shell type: ${shellType}`);
+          
+          // Get the appropriate scripts for this shell type
+          const { setupScript, cleanupScript, commandPrefix } = 
+              this.getShellScripts(shellType, startMarker, endMarker);
+          
+          // Send the appropriate setup script
+          session.tab.sendInput(setupScript);
+          
+          // Execute the command with the appropriate prefix
+          session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && ${command}\n`);
           
           // Wait for command output
           let output = '';
@@ -263,15 +492,7 @@ unset __tabby_post_command
             await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
             
             // Get terminal buffer
-            let textAfter = "";
-            if (session.tab.frontend instanceof XTermFrontend) {
-              if (!session.tab.frontend.xterm['_serializeAddon']) {
-                const addon = new SerializeAddon();
-                session.tab.frontend.xterm.loadAddon(addon);
-                session.tab.frontend.xterm['_serializeAddon'] = addon;
-              }
-              textAfter = session.tab.frontend.xterm['_serializeAddon'].serialize();
-            }
+            const textAfter = this.getTerminalBufferText(session);
 
             // Clean ANSI codes and process output
             const cleanTextAfter = stripAnsi(textAfter);
@@ -321,8 +542,7 @@ unset __tabby_post_command
           }
 
           // Cleanup hooks
-
-          session.tab.sendInput(cleanupScriptContent);
+          session.tab.sendInput(cleanupScript);
 
           // Clear active command
           this.setActiveCommand(null);
@@ -331,16 +551,7 @@ unset __tabby_post_command
           if (aborted) {
             console.log(`[DEBUG] Command was aborted, retrieving partial output`);
             
-            let textAfter = "";
-            if (session.tab.frontend instanceof XTermFrontend) {
-              if (!session.tab.frontend.xterm['_serializeAddon']) {
-                const addon = new SerializeAddon();
-                session.tab.frontend.xterm.loadAddon(addon);
-                session.tab.frontend.xterm['_serializeAddon'] = addon;
-              }
-              textAfter = session.tab.frontend.xterm['_serializeAddon'].serialize();
-            }
-
+            const textAfter = this.getTerminalBufferText(session);
             const cleanTextAfter = stripAnsi(textAfter);
             const lines = cleanTextAfter.split('\n');
             
@@ -419,7 +630,6 @@ unset __tabby_post_command
               const addon = new SerializeAddon();
               session.tab.frontend.xterm.loadAddon(addon);
               session.tab.frontend.xterm['_serializeAddon'] = addon;
-              console.log('✅ SerializeAddon loaded');
             }
             bufferText = session.tab.frontend.xterm['_serializeAddon'].serialize() || '';
             console.log(`[DEBUG] Buffer text retrieved (length: ${bufferText.length})`);

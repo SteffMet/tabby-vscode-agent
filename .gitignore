@@ -134,3 +134,10 @@ dist
 .yarn/build-state.yml
 .yarn/install-state.gz
 .pnp.*
+
+# Tabby-MCP
+mcp_llm.txt
+package-lock.json
+build-and-copy.sh
+typings
+

@@ -225,7 +225,7 @@ export class ExecToolCategory extends BaseToolCategory {
    * @returns Bash-specific cleanup script
    */
   private getBashCleanupScript(): string {
-    return `trap - DEBUG 2>/dev/null; PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g'); unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
+    return `unset PROMPT_COMMAND; unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
   }
 
   /**

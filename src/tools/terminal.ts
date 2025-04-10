@@ -168,19 +168,7 @@ export class ExecToolCategory extends BaseToolCategory {
    * @returns Shell detection script
    */
   private getShellDetectionScript(): string {
-    return `
-# More reliable shell detection
-if [ -n "$BASH_VERSION" ]; then
-  echo "SHELL_TYPE=${this.SHELL_TYPE_BASH}"
-elif [ -n "$ZSH_VERSION" ]; then
-  echo "SHELL_TYPE=${this.SHELL_TYPE_ZSH}"
-# Check if we're running in sh (more ways to detect)
-elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then
-  echo "SHELL_TYPE=${this.SHELL_TYPE_SH}"
-else
-  echo "SHELL_TYPE=${this.SHELL_TYPE_UNKNOWN}"
-fi
-`;
+    return `if [ -n "$BASH_VERSION" ]; then echo "SHELL_TYPE=${this.SHELL_TYPE_BASH}"; elif [ -n "$ZSH_VERSION" ]; then echo "SHELL_TYPE=${this.SHELL_TYPE_ZSH}"; elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then echo "SHELL_TYPE=${this.SHELL_TYPE_SH}"; else echo "SHELL_TYPE=${this.SHELL_TYPE_UNKNOWN}"; fi`;
   }
 
   /**
@@ -209,31 +197,7 @@ fi
    * @returns Bash-specific setup script
    */
   private getBashSetupScript(startMarker: string, endMarker: string): string {
-    return `
-# Bash-specific setup
-__TABBY_MARKER_EMITTED=0
-
-function __tabby_post_command() {
-  # Only execute if we haven't emitted the marker yet
-  if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then
-    local exit_code=$?
-    local last_cmd=$(HISTTIMEFORMAT='' history 1 | awk '{$1=""; print substr($0,2)}')
-    if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then
-      # Set the flag to prevent further executions
-      __TABBY_MARKER_EMITTED=1
-      echo "${endMarker}"
-      echo "exit_code: $exit_code"
-    fi
-  fi
-}
-
-# Clean any existing hooks
-trap - DEBUG 2>/dev/null
-PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g')
-
-# Setup the new hook
-PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"
-`;
+    return `__TABBY_MARKER_EMITTED=0; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(HISTTIMEFORMAT='' history 1 | awk '{$1=""; print substr($0,2)}'); if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; fi; fi; }; trap - DEBUG 2>/dev/null; PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g'); PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"`;
   }
 
   /**
@@ -243,23 +207,7 @@ PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"
    * @returns Zsh-specific setup script
    */
   private getZshSetupScript(startMarker: string, endMarker: string): string {
-    return `
-# Zsh-specific setup
-function __tabby_post_command() {
-  local exit_code=$?
-  local last_cmd=$(fc -ln -1)
-  if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then
-    echo "${endMarker}"
-    echo "exit_code: $exit_code"
-  fi
-}
-
-# Clean any existing hooks
-precmd_functions=()
-
-# Setup the new hook
-precmd_functions=(__tabby_post_command)
-`;
+    return `__TABBY_MARKER_EMITTED=0; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(fc -ln -1); if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; fi; fi; }; precmd_functions=(); precmd_functions=(__tabby_post_command)`;
   }
 
   /**
@@ -269,27 +217,7 @@ precmd_functions=(__tabby_post_command)
    * @returns POSIX sh-specific setup script
    */
   private getShSetupScript(startMarker: string, endMarker: string): string {
-    return `
-# Generic sh setup - POSIX compatible
-# Create a flag file for tracking command execution
-__TABBY_CMD_FLAG="/tmp/tabby_cmd_$$"
-
-# Define post command function using POSIX-compatible syntax
-__tabby_post_command() {
-  local exit_code=$?
-  if [ -f "$__TABBY_CMD_FLAG" ]; then
-    echo "${endMarker}"
-    echo "exit_code: $exit_code"
-    rm -f "$__TABBY_CMD_FLAG" 2>/dev/null
-  fi
-}
-
-# Save old PS1 if we need to restore it
-OLD_PS1="$PS1"
-
-# Set up new PS1 with our hook
-PS1='$(__tabby_post_command)'$PS1
-`;
+    return `__TABBY_CMD_FLAG="/tmp/tabby_cmd_$$"; __tabby_post_command() { local exit_code=$?; if [ -f "$__TABBY_CMD_FLAG" ]; then echo "${endMarker}"; echo "exit_code: $exit_code"; rm -f "$__TABBY_CMD_FLAG" 2>/dev/null; fi; }; OLD_PS1="$PS1"; PS1='$(__tabby_post_command)'$PS1`;
   }
 
   /**
@@ -297,13 +225,7 @@ PS1='$(__tabby_post_command)'$PS1
    * @returns Bash-specific cleanup script
    */
   private getBashCleanupScript(): string {
-    return `
-# Bash cleanup
-trap - DEBUG 2>/dev/null
-PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g')
-unset __tabby_post_command
-unset __TABBY_MARKER_EMITTED
-`;
+    return `trap - DEBUG 2>/dev/null; PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g'); unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
   }
 
   /**
@@ -311,11 +233,7 @@ unset __TABBY_MARKER_EMITTED
    * @returns Zsh-specific cleanup script
    */
   private getZshCleanupScript(): string {
-    return `
-# Zsh cleanup
-precmd_functions=()
-unset __tabby_post_command
-`;
+    return `precmd_functions=(); unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
   }
 
   /**
@@ -323,17 +241,7 @@ unset __tabby_post_command
    * @returns POSIX sh-specific cleanup script
    */
   private getShCleanupScript(): string {
-    return `
-# Sh cleanup - POSIX compatible
-if [ -n "$OLD_PS1" ]; then
-  PS1="$OLD_PS1"
-  unset OLD_PS1
-fi
-unset __tabby_post_command
-# Remove the flag file if it exists
-rm -f "$__TABBY_CMD_FLAG" 2>/dev/null
-unset __TABBY_CMD_FLAG
-`;
+    return `if [ -n "$OLD_PS1" ]; then PS1="$OLD_PS1"; unset OLD_PS1; fi; unset __tabby_post_command; rm -f "$__TABBY_CMD_FLAG" 2>/dev/null; unset __TABBY_CMD_FLAG`;
   }
 
   /**
@@ -461,7 +369,7 @@ unset __TABBY_CMD_FLAG
           const detectShellScript = this.getShellDetectionScript();
           
           // Send the detection script
-          session.tab.sendInput(detectShellScript);
+          session.tab.sendInput(`\n${detectShellScript}\n`);
           
           // Wait a moment for the shell type to be detected
           await new Promise(resolve => setTimeout(resolve, 100));
@@ -478,10 +386,10 @@ unset __TABBY_CMD_FLAG
               this.getShellScripts(shellType, startMarker, endMarker);
           
           // Send the appropriate setup script
-          session.tab.sendInput(setupScript);
+          session.tab.sendInput(`\n${setupScript}\n`);
           
           // Execute the command with the appropriate prefix
-          session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && ${command}\n`);
+          session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command}\n`);
           
           // Wait for command output
           let output = '';
@@ -542,7 +450,7 @@ unset __TABBY_CMD_FLAG
           }
 
           // Cleanup hooks
-          session.tab.sendInput(cleanupScript);
+          session.tab.sendInput('\n' + cleanupScript + '\n');
 
           // Clear active command
           this.setActiveCommand(null);

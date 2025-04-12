@@ -10,8 +10,14 @@ export class McpLoggerService {
     private debugEnabled = false;
     
     constructor(private config: ConfigService) {
-        // Initialize debug enabled from config
-        this.debugEnabled = !!this.config.store.mcp?.enableDebugLogging;
+        // Initialize debug enabled from config in a safe way
+        try {
+            this.debugEnabled = !!(this.config.store && this.config.store.mcp && this.config.store.mcp.enableDebugLogging);
+        } catch (err) {
+            // Default to false if config is not available yet
+            this.debugEnabled = false;
+            console.log('[MCP Logger] Config not fully initialized, defaulting debug to false');
+        }
     }
     
     /**

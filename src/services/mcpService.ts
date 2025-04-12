@@ -1,7 +1,5 @@
 import { Injectable } from '@angular/core';
 
-import { ConfigService } from './config.service';
-// import { TabToolCategory } from '../tools/tab';
 import { ExecToolCategory } from '../tools/terminal';
 import { ToolCategory } from '../type/types';
 
@@ -10,6 +8,9 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import { SSEServerTransport } from "@modelcontextprotocol/sdk/server/sse.js";
 import { z } from 'zod';
 import { IncomingMessage, ServerResponse } from 'http';
+import { ConfigService } from 'tabby-core';
+import * as http from 'http';
+import { McpLoggerService } from './mcpLogger.service';
 
 /**
  * The main MCP server service for Tabby
@@ -20,23 +21,20 @@ export class McpService {
   private server: McpServer;
   private transports: { [sessionId: string]: SSEServerTransport } = {};
   private app: express.Application;
-  private port: number;
   private isRunning = false;
   private toolCategories: ToolCategory[] = [];
+  private httpServer: http.Server;
 
   constructor(
-    private config: ConfigService,
-    // private tabToolCategory: TabToolCategory,
-    private execToolCategory: ExecToolCategory
+    public config: ConfigService,
+    private execToolCategory: ExecToolCategory,
+    private logger: McpLoggerService
   ) {
     // Initialize MCP Server
     this.server = new McpServer({
       name: "Tabby",
       version: "1.0.0"
     });
-
-    // Get port from config or use default
-    this.port = this.config.store.mcp?.port || 3001;
 
     // Register tool categories
     // this.registerToolCategory(this.tabToolCategory);
@@ -82,12 +80,12 @@ export class McpService {
     });
 
     this.app.get("/sse", async (req: Request, res: Response) => {
-      console.log("Establishing new SSE connection");
+      this.logger.info("Establishing new SSE connection");
       const transport = new SSEServerTransport(
         "/messages",
         res as unknown as ServerResponse<IncomingMessage>,
       );
-      console.log(`New SSE connection established for sessionId ${transport.sessionId}`);
+      this.logger.info(`New SSE connection established for sessionId ${transport.sessionId}`);
 
       this.transports[transport.sessionId] = transport;
       res.on("close", () => {
@@ -103,7 +101,7 @@ export class McpService {
         res.status(400).send(`No transport found for sessionId ${sessionId}`);
         return;
       }
-      console.log(`Received message for sessionId ${sessionId}`);
+      this.logger.info(`Received message for sessionId ${sessionId}`);
       await this.transports[sessionId].handlePostMessage(req, res);
     });
   }
@@ -111,30 +109,40 @@ export class McpService {
   /**
    * Initialize the MCP service
    */
-  public async initialize(): Promise<void> {
-    if (this.isRunning) {
-      console.log('[MCP Service] Already running');
-      return;
-    }
+  public initialize(port: number): Promise<void> {
+    return new Promise((resolve, reject) => {
+      try {
+        // Create and start the HTTP server
+        const httpServer = http.createServer(this.app);
 
-    try {
-      // Start the server
-      this.app.listen(this.port, () => {
-        console.log(`[MCP Service] MCP server listening on port ${this.port}`);
-        this.isRunning = true;
-      });
-    } catch (err) {
-      console.error('[MCP Service] Failed to start MCP server:', err);
-      throw err;
-    }
+        // Start the server
+        httpServer.listen(port, () => {
+          this.logger.info(`[MCP Service] MCP server listening on port ${port}`);
+          this.isRunning = true;
+          this.httpServer = httpServer;
+          resolve();
+        });
+
+        // Handle server errors
+        httpServer.on('error', (err) => {
+          this.logger.error('[MCP Service] MCP server error:', err);
+          this.isRunning = false;
+          reject(err);
+        });
+      } catch (err) {
+        this.logger.error('[MCP Service] Failed to initialize MCP server:', err);
+        this.isRunning = false;
+        reject(err);
+      }
+    });
   }
 
   /**
    * Start the MCP server
    * This is a convenience method for the UI
    */
-  public async startServer(): Promise<void> {
-    return this.initialize();
+  public async startServer(port: number): Promise<void> {
+    return this.initialize(port);
   }
 
   /**
@@ -142,7 +150,7 @@ export class McpService {
    */
   public async stop(): Promise<void> {
     if (!this.isRunning) {
-      console.log('[MCP Service] Not running');
+      this.logger.info('[MCP Service] Not running');
       return;
     }
 
@@ -152,10 +160,14 @@ export class McpService {
         transport.close();
       });
       
+      if (this.httpServer) {
+        this.httpServer.close();
+      }
+      
       this.isRunning = false;
-      console.log('[MCP Service] MCP server stopped');
+      this.logger.info('[MCP Service] MCP server stopped');
     } catch (err) {
-      console.error('[MCP Service] Failed to stop MCP server:', err);
+      this.logger.error('[MCP Service] Failed to stop MCP server:', err);
       throw err;
     }
   }

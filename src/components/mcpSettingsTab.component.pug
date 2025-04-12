@@ -6,21 +6,44 @@
 
   .form-group
     label Server URL
-    input.form-control(
-      type='text',
-      [(ngModel)]='config.store.mcp.serverUrl',
-      (ngModelChange)='config.save()',
-    )
+    .d-flex
+      input.form-control.mr-2(
+        type='text',
+        [(ngModel)]='serverUrl',
+      )
+      button.btn.btn-secondary(
+        (click)='saveServerUrl()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
     .text-muted The URL of the MCP server to connect to
 
   .form-group
     label Port
-    input.form-control(
-      type='number',
-      [(ngModel)]='config.store.mcp.port',
-      (ngModelChange)='config.save()',
-    )
+    .d-flex
+      input.form-control.mr-2(
+        type='number',
+        [(ngModel)]='port',
+      )
+      button.btn.btn-secondary(
+        (click)='savePort()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
     .text-muted The port number for the MCP server
+
+  .form-group
+    label Start on Boot
+    .d-flex
+      toggle(
+        [(ngModel)]='startOnBoot',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleStartOnBoot()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Automatically start the MCP server when Tabby starts
 
   .form-group
     label Server Control
@@ -41,9 +64,14 @@
     .text-muted.mt-2(*ngIf='!isServerRunning') Server is currently stopped
 
   .form-group
-    label Enable Debug Logging
-    toggle(
-      [(ngModel)]='config.store.mcp.enableDebugLogging',
-      (ngModelChange)='toggleDebugLogging()',
-    )
+    label Debug Logging
+    .d-flex
+      toggle(
+        [(ngModel)]='enableDebugLogging',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleDebugLogging()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
     .text-muted Enable detailed logging for MCP operations

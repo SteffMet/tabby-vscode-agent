@@ -33,7 +33,7 @@
     "@angular/forms": "^15",
     "@ng-bootstrap/ng-bootstrap": "^14",
     "rxjs": "^7",
-    "tabby-core": "*",
-    "tabby-terminal": "*"
+    "@tienthuan/tabby-core": "^1.0.223",
+    "@tienthuan/tabby-terminal": "^1.0.223"
   }
 } 

@@ -3,13 +3,14 @@ import stripAnsi from 'strip-ansi';
 import { createErrorResponse, createJsonResponse } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
+import { McpLoggerService } from '../../services/mcpLogger.service';
 
 /**
  * Tool for getting terminal buffer content with line range options
  */
 export class GetTerminalBufferTool extends BaseTool {
-  constructor(private execToolCategory: ExecToolCategory) {
-    super();
+  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService) {
+    super(logger);
   }
 
   getTool() {
@@ -67,7 +68,7 @@ export class GetTerminalBufferTool extends BaseTool {
             endLine: endLine === -1 ? totalLines : endLine
           });
         } catch (err) {
-          console.error(`[DEBUG] Error getting terminal buffer:`, err);
+          this.logger.error(`Error getting terminal buffer:`, err);
           return createErrorResponse(`Failed to get terminal buffer: ${err.message || err}`);
         }
       }

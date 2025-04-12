@@ -1,13 +1,14 @@
 import { createJsonResponse } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
+import { McpLoggerService } from '../../services/mcpLogger.service';
 
 /**
  * Tool for getting a list of SSH sessions
  */
 export class SshSessionListTool extends BaseTool {
-  constructor(private execToolCategory: ExecToolCategory) {
-    super();
+  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService) {
+    super(logger);
   }
 
   getTool() {

@@ -1,13 +1,14 @@
 import { createErrorResponse, createSuccessResponse } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
+import { McpLoggerService } from '../../services/mcpLogger.service';
 
 /**
  * Tool for aborting the current command
  */
 export class AbortCommandTool extends BaseTool {
-  constructor(private execToolCategory: ExecToolCategory) {
-    super();
+  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService) {
+    super(logger);
   }
 
   getTool() {
@@ -24,7 +25,7 @@ export class AbortCommandTool extends BaseTool {
           this.execToolCategory.abortCurrentCommand();
           return createSuccessResponse('Command aborted successfully');
         } catch (err) {
-          console.error(`[DEBUG] Error aborting command:`, err);
+          this.logger.error(`Error aborting command:`, err);
           return createErrorResponse(`Failed to abort command: ${err.message || err}`);
         }
       }

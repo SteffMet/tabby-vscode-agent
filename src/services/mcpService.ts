@@ -130,6 +130,14 @@ export class McpService {
   }
 
   /**
+   * Start the MCP server
+   * This is a convenience method for the UI
+   */
+  public async startServer(): Promise<void> {
+    return this.initialize();
+  }
+
+  /**
    * Stop the MCP service
    */
   public async stop(): Promise<void> {
@@ -150,6 +158,22 @@ export class McpService {
       console.error('[MCP Service] Failed to stop MCP server:', err);
       throw err;
     }
+  }
+
+  /**
+   * Stop the MCP server
+   * This is a convenience method for the UI
+   */
+  public async stopServer(): Promise<void> {
+    return this.stop();
+  }
+
+  /**
+   * Check if the MCP server is running
+   * @returns true if the server is running, false otherwise
+   */
+  public isServerRunning(): boolean {
+    return this.isRunning;
   }
 }
 

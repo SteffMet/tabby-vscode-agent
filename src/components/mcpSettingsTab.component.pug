@@ -14,18 +14,36 @@
     .text-muted The URL of the MCP server to connect to
 
   .form-group
-    label Connection Timeout (ms)
+    label Port
     input.form-control(
       type='number',
-      [(ngModel)]='config.store.mcp.connectionTimeout',
+      [(ngModel)]='config.store.mcp.port',
       (ngModelChange)='config.save()',
     )
-    .text-muted Timeout for MCP server connection in milliseconds
+    .text-muted The port number for the MCP server
+
+  .form-group
+    label Server Control
+    .d-flex
+      button.btn.btn-primary.mr-2(
+        *ngIf='!isServerRunning',
+        (click)='startServer()',
+      )
+        i.fas.fa-play.mr-2
+        span Start Server
+      button.btn.btn-danger(
+        *ngIf='isServerRunning',
+        (click)='stopServer()',
+      )
+        i.fas.fa-stop.mr-2
+        span Stop Server
+    .text-muted.mt-2(*ngIf='isServerRunning') Server is currently running
+    .text-muted.mt-2(*ngIf='!isServerRunning') Server is currently stopped
 
   .form-group
     label Enable Debug Logging
     toggle(
       [(ngModel)]='config.store.mcp.enableDebugLogging',
-      (ngModelChange)='config.save()',
+      (ngModelChange)='toggleDebugLogging()',
     )
     .text-muted Enable detailed logging for MCP operations

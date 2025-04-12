@@ -2,10 +2,10 @@ import { Injectable } from '@angular/core';
 import { AppService, SplitTabComponent } from 'tabby-core';
 import { BaseTerminalTabComponent, XTermFrontend } from 'tabby-terminal';
 import { BaseToolCategory } from './base-tool-category';
-import { McpTool } from '../type/types';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { BehaviorSubject } from 'rxjs';
 import { ShellContext } from './shell-strategy';
+import { McpLoggerService } from '../services/mcpLogger.service';
 import { 
   SshSessionListTool, 
   AbortCommandTool, 
@@ -51,12 +51,12 @@ export class ExecToolCategory extends BaseToolCategory {
   // Shell context for managing different shell types
   public shellContext = new ShellContext();
 
-  constructor(private app: AppService) {
-    super();
+  constructor(private app: AppService, logger: McpLoggerService) {
+    super(logger);
     
     // Log discovered terminal sessions for debugging
     this.findAndSerializeTerminalSessions().forEach(session => {
-      console.log(`[DEBUG] Found session: ${session.id}, ${session.tab.title}`);
+      this.logger.debug(`Found session: ${session.id}, ${session.tab.title}`);
     });
     
     // Initialize and register all tools
@@ -68,10 +68,10 @@ export class ExecToolCategory extends BaseToolCategory {
    */
   private initializeTools(): void {
     // Create tool instances
-    const sshSessionListTool = new SshSessionListTool(this);
-    const abortCommandTool = new AbortCommandTool(this);
-    const execCommandTool = new ExecCommandTool(this);
-    const getTerminalBufferTool = new GetTerminalBufferTool(this);
+    const sshSessionListTool = new SshSessionListTool(this, this.logger);
+    const abortCommandTool = new AbortCommandTool(this, this.logger);
+    const execCommandTool = new ExecCommandTool(this, this.logger);
+    const getTerminalBufferTool = new GetTerminalBufferTool(this, this.logger);
 
     // Register tools
     this.registerTool(sshSessionListTool.getTool());
@@ -93,7 +93,7 @@ export class ExecToolCategory extends BaseToolCategory {
   public setActiveCommand(command: ActiveCommand | null): void {
     this._activeCommand = command;
     this._activeCommandSubject.next(command);
-    console.log(`[DEBUG] Active command updated: ${command ? command.command : 'none'}`);
+    this.logger.debug(`Active command updated: ${command ? command.command : 'none'}`);
   }
 
   /**
@@ -105,7 +105,7 @@ export class ExecToolCategory extends BaseToolCategory {
       this._activeCommand.abort();
       this._activeCommand = null;
       this._activeCommandSubject.next(null);
-      console.log(`[DEBUG] Command aborted by user`);
+      this.logger.debug(`Command aborted by user`);
     }
   }
 
@@ -143,7 +143,7 @@ export class ExecToolCategory extends BaseToolCategory {
     try {
       const frontend = session.tab.frontend as XTermFrontend;
       if (!frontend || !frontend.xterm) {
-        console.error(`[DEBUG] No xterm frontend available for session ${session.id}`);
+        this.logger.error(`No xterm frontend available for session ${session.id}`);
         return '';
       }
       
@@ -161,7 +161,7 @@ export class ExecToolCategory extends BaseToolCategory {
       // Get the terminal content
       return serializeAddon.serialize();
     } catch (err) {
-      console.error(`[DEBUG] Error getting terminal buffer:`, err);
+      this.logger.error(`Error getting terminal buffer:`, err);
       return '';
     }
   }

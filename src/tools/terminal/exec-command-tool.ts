@@ -3,13 +3,14 @@ import stripAnsi from 'strip-ansi';
 import { createErrorResponse, createSuccessResponse } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
+import { McpLoggerService } from '../../services/mcpLogger.service';
 
 /**
  * Tool for executing a command in a terminal
  */
 export class ExecCommandTool extends BaseTool {
-  constructor(private execToolCategory: ExecToolCategory) {
-    super();
+  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService) {
+    super(logger);
   }
 
   getTool() {
@@ -51,7 +52,7 @@ export class ExecCommandTool extends BaseTool {
             }
           }
           
-          console.log(`[DEBUG] Using terminal session ${session.id} (${session.tab.title})`);
+          this.logger.info(`Using terminal session ${session.id} (${session.tab.title})`);
           
           // Generate unique markers for this command
           const timestamp = Date.now();
@@ -93,7 +94,7 @@ export class ExecCommandTool extends BaseTool {
           
           // Determine shell type from output
           const shellType = this.execToolCategory.shellContext.detectShellType(textBeforeSetup);
-          console.log(`[DEBUG] Detected shell type: ${shellType}`);
+          this.logger.info(`Detected shell type: ${shellType}`);
           
           // Get the appropriate shell strategy
           const shellStrategy = this.execToolCategory.shellContext.getStrategy(shellType);
@@ -176,7 +177,7 @@ export class ExecCommandTool extends BaseTool {
           this.execToolCategory.setActiveCommand(null);
 
           if (aborted) {
-            console.log(`[DEBUG] Command was aborted, retrieving partial output`);
+            this.logger.info(`Command was aborted, retrieving partial output`);
             
             const textAfter = this.execToolCategory.getTerminalBufferText(session);
             const cleanTextAfter = stripAnsi(textAfter);
@@ -205,10 +206,10 @@ export class ExecCommandTool extends BaseTool {
             return createSuccessResponse(output, { aborted: true, promptShell, exitCode });
           }
 
-          console.log(`[DEBUG] Command executed: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
+          this.logger.info(`Command executed: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
           return createSuccessResponse(output, { promptShell, exitCode });
         } catch (err) {
-          console.error(`[DEBUG] Error executing command:`, err);
+          this.logger.error(`Error executing command:`, err);
           this.execToolCategory.setActiveCommand(null);
           return createErrorResponse(`Failed to execute command: ${err.message || err}`);
         }

@@ -3,6 +3,8 @@ import { Injectable } from '@angular/core';
 export interface McpConfig {
   enabled?: boolean;
   port?: number;
+  serverUrl?: string;
+  enableDebugLogging?: boolean;
 }
 
 export interface ConfigStore {
@@ -14,7 +16,9 @@ export class ConfigService {
   private _store: ConfigStore = {
     mcp: {
       enabled: true,
-      port: 3001
+      port: 3001,
+      serverUrl: 'http://localhost:3001',
+      enableDebugLogging: false
     }
   };
 

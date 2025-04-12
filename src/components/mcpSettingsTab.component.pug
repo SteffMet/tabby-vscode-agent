@@ -1,0 +1,31 @@
+.content
+  .form-line
+    .header
+      .title MCP Settings
+      .description Configure settings for the MCP (Model Control Protocol) integration
+
+  .form-group
+    label Server URL
+    input.form-control(
+      type='text',
+      [(ngModel)]='config.store.mcp.serverUrl',
+      (ngModelChange)='config.save()',
+    )
+    .text-muted The URL of the MCP server to connect to
+
+  .form-group
+    label Connection Timeout (ms)
+    input.form-control(
+      type='number',
+      [(ngModel)]='config.store.mcp.connectionTimeout',
+      (ngModelChange)='config.save()',
+    )
+    .text-muted Timeout for MCP server connection in milliseconds
+
+  .form-group
+    label Enable Debug Logging
+    toggle(
+      [(ngModel)]='config.store.mcp.enableDebugLogging',
+      (ngModelChange)='config.save()',
+    )
+    .text-muted Enable detailed logging for MCP operations

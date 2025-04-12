@@ -7,6 +7,7 @@ import * as z from 'zod';
 import stripAnsi from 'strip-ansi';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { BehaviorSubject } from 'rxjs';
+import { ShellContext } from './shell-strategy';
 
 /**
  * Interface for terminal tab component with ID
@@ -43,11 +44,8 @@ export class ExecToolCategory extends BaseToolCategory {
   // Observable for UI to subscribe to
   public readonly activeCommand$ = this._activeCommandSubject.asObservable();
 
-  // Shell type definitions
-  private readonly SHELL_TYPE_BASH = 'bash';
-  private readonly SHELL_TYPE_ZSH = 'zsh';
-  private readonly SHELL_TYPE_SH = 'sh';
-  private readonly SHELL_TYPE_UNKNOWN = 'unknown';
+  // Shell context for managing different shell types
+  private shellContext = new ShellContext();
 
   constructor(private app: AppService) {
     super();
@@ -85,6 +83,7 @@ export class ExecToolCategory extends BaseToolCategory {
    */
   public abortCurrentCommand(): void {
     if (this._activeCommand) {
+      // Call the abort handler which just sets the aborted flag
       this._activeCommand.abort();
       this._activeCommand = null;
       this._activeCommandSubject.next(null);
@@ -164,148 +163,35 @@ export class ExecToolCategory extends BaseToolCategory {
   }
 
   /**
-   * Generate shell detection script
-   * @returns Shell detection script
-   */
-  private getShellDetectionScript(): string {
-    return `if [ -n "$BASH_VERSION" ]; then echo "SHELL_TYPE=${this.SHELL_TYPE_BASH}"; elif [ -n "$ZSH_VERSION" ]; then echo "SHELL_TYPE=${this.SHELL_TYPE_ZSH}"; elif [ "$(basename "$0")" = "sh" ] || [ "$0" = "-sh" ] || [ "$0" = "/bin/sh" ] || [ -n "$PS1" ]; then echo "SHELL_TYPE=${this.SHELL_TYPE_SH}"; else echo "SHELL_TYPE=${this.SHELL_TYPE_UNKNOWN}"; fi`;
-  }
-
-  /**
-   * Detect shell type from terminal output
-   * @param terminalOutput The terminal output containing shell type
-   * @returns The detected shell type
-   */
-  private detectShellType(terminalOutput: string): string {
-    const lines = stripAnsi(terminalOutput).split('\n');
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i];
-      if (line.startsWith('SHELL_TYPE=')) {
-        // Trim any whitespace or special characters
-        const shellType = line.split('=')[1].trim();
-        console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
-        return shellType;
-      }
-    }
-    return this.SHELL_TYPE_UNKNOWN;
-  }
-
-  /**
-   * Get shell setup script for Bash
-   * @param startMarker The start marker for command tracking
-   * @param endMarker The end marker for command tracking
-   * @returns Bash-specific setup script
-   */
-  private getBashSetupScript(startMarker: string, endMarker: string): string {
-    return `__TABBY_MARKER_EMITTED=0; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(HISTTIMEFORMAT='' history 1 | awk '{$1=""; print substr($0,2)}'); if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; fi; fi; }; trap - DEBUG 2>/dev/null; PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g'); PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"`;
-  }
-
-  /**
-   * Get shell setup script for Zsh
-   * @param startMarker The start marker for command tracking
-   * @param endMarker The end marker for command tracking
-   * @returns Zsh-specific setup script
-   */
-  private getZshSetupScript(startMarker: string, endMarker: string): string {
-    return `__TABBY_MARKER_EMITTED=0; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(fc -ln -1); if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; fi; fi; }; precmd_functions=(); precmd_functions=(__tabby_post_command)`;
-  }
-
-  /**
-   * Get shell setup script for generic POSIX shell
-   * @param startMarker The start marker for command tracking
-   * @param endMarker The end marker for command tracking
-   * @returns POSIX sh-specific setup script
-   */
-  private getShSetupScript(startMarker: string, endMarker: string): string {
-    return `__TABBY_CMD_FLAG="/tmp/tabby_cmd_$$"; __tabby_post_command() { local exit_code=$?; if [ -f "$__TABBY_CMD_FLAG" ]; then echo "${endMarker}"; echo "exit_code: $exit_code"; rm -f "$__TABBY_CMD_FLAG" 2>/dev/null; fi; }; OLD_PS1="$PS1"; PS1='$(__tabby_post_command)'$PS1`;
-  }
-
-  /**
-   * Get shell cleanup script for Bash
-   * @returns Bash-specific cleanup script
-   */
-  private getBashCleanupScript(): string {
-    return `unset PROMPT_COMMAND; unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
-  }
-
-  /**
-   * Get shell cleanup script for Zsh
-   * @returns Zsh-specific cleanup script
-   */
-  private getZshCleanupScript(): string {
-    return `precmd_functions=(); unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
-  }
-
-  /**
-   * Get shell cleanup script for generic POSIX shell
-   * @returns POSIX sh-specific cleanup script
-   */
-  private getShCleanupScript(): string {
-    return `if [ -n "$OLD_PS1" ]; then PS1="$OLD_PS1"; unset OLD_PS1; fi; unset __tabby_post_command; rm -f "$__TABBY_CMD_FLAG" 2>/dev/null; unset __TABBY_CMD_FLAG`;
-  }
-
-  /**
-   * Get the appropriate scripts for a specific shell type
-   * @param shellType The detected shell type
-   * @param startMarker The start marker for command tracking
-   * @param endMarker The end marker for command tracking
-   * @returns Object containing setup script, cleanup script, and command prefix
-   */
-  private getShellScripts(shellType: string, startMarker: string, endMarker: string): { 
-    setupScript: string; 
-    cleanupScript: string; 
-    commandPrefix: string;
-  } {
-    // Normalize the shell type by trimming and converting to lowercase
-    const normalizedShellType = shellType.trim().toLowerCase();
-    
-    // Log actual values for debugging
-    console.log(`[DEBUG] Normalized shell type: "${normalizedShellType}"`);
-    console.log(`[DEBUG] SHELL_TYPE_BASH constant: "${this.SHELL_TYPE_BASH}"`);
-    console.log(`[DEBUG] SHELL_TYPE_ZSH constant: "${this.SHELL_TYPE_ZSH}"`);
-    
-    // Use if/else instead of switch for more explicit string comparison
-    if (normalizedShellType === this.SHELL_TYPE_BASH) {
-      console.log(`[DEBUG] Selected shell script: bash`);
-      return {
-        setupScript: this.getBashSetupScript(startMarker, endMarker),
-        cleanupScript: this.getBashCleanupScript(),
-        commandPrefix: ''
-      };
-    } else if (normalizedShellType === this.SHELL_TYPE_ZSH) {
-      console.log(`[DEBUG] Selected shell script: zsh`);
-      return {
-        setupScript: this.getZshSetupScript(startMarker, endMarker),
-        cleanupScript: this.getZshCleanupScript(),
-        commandPrefix: ''
-      };
-    } else {
-      console.log(`[DEBUG] Selected shell script: default (sh)`);
-      return {
-        setupScript: this.getShSetupScript(startMarker, endMarker),
-        cleanupScript: this.getShCleanupScript(),
-        // For sh, we create the flag file right before running the command
-        commandPrefix: 'touch "$__TABBY_CMD_FLAG" && '
-      };
-    }
-  }
-
-  /**
    * Get terminal buffer content as text
    * @param session The terminal session
    * @returns The terminal buffer content as text
    */
   private getTerminalBufferText(session: BaseTerminalTabComponentWithId): string {
-    let bufferText = "";
-    if (session.tab.frontend instanceof XTermFrontend) {
-      if (!session.tab.frontend.xterm['_serializeAddon']) {
-        const addon = new SerializeAddon();
-        session.tab.frontend.xterm.loadAddon(addon);
-        session.tab.frontend.xterm['_serializeAddon'] = addon;
+    try {
+      const frontend = session.tab.frontend as XTermFrontend;
+      if (!frontend || !frontend.xterm) {
+        console.error(`[DEBUG] No xterm frontend available for session ${session.id}`);
+        return '';
       }
-      bufferText = session.tab.frontend.xterm['_serializeAddon'].serialize();
+      
+      // Check if serialize addon is already registered
+      let serializeAddon = (frontend.xterm as any)._addonManager._addons.find(
+        addon => addon.instance instanceof SerializeAddon
+      )?.instance;
+      
+      // If not, register it
+      if (!serializeAddon) {
+        serializeAddon = new SerializeAddon();
+        frontend.xterm.loadAddon(serializeAddon);
+      }
+      
+      // Get the terminal content
+      return serializeAddon.serialize();
+    } catch (err) {
+      console.error(`[DEBUG] Error getting terminal buffer:`, err);
+      return '';
     }
-    return bufferText;
   }
 
   /**
@@ -323,36 +209,51 @@ export class ExecToolCategory extends BaseToolCategory {
         tabId: z.string().optional().describe('Tab ID to execute in, get from get_ssh_session_list')
       },
       handler: async (params, extra) => {
-        const {
-          command,
-          tabId
-        } = params;
-
-        const sessions = this.findAndSerializeTerminalSessions();
-        const session = sessions.find(s => s.id === parseInt(tabId, 10));
-        
-        if (!session) {
-          return createErrorResponse('Invalid tab ID');
-        }
-
-        console.log(`[DEBUG] Execute command: ${command}, tabIndex: ${session.id}`);
-
-        // Check if another command is already running
-        if (this._activeCommand) {
-          return createErrorResponse('Another command is already running. Abort it first.');
-        }
-
         try {
-          // Create timestamp and markers first
+          const { command, tabId } = params;
+          
+          // Check if a command is already running
+          if (this._activeCommand) {
+            return createErrorResponse('A command is already running. Abort it first.');
+          }
+          
+          // Find all terminal sessions
+          const sessions = this.findAndSerializeTerminalSessions();
+          
+          // If no tabId is provided, use the active tab
+          let session: BaseTerminalTabComponentWithId | undefined;
+          if (tabId) {
+            session = sessions.find(s => s.id.toString() === tabId);
+            if (!session) {
+              return createErrorResponse(`No terminal session found with ID ${tabId}`);
+            }
+          } else {
+            // Find the active tab
+            session = sessions.find(s => s.tab.hasFocus);
+            if (!session) {
+              // If no active tab, use the first one
+              session = sessions[0];
+              if (!session) {
+                return createErrorResponse('No terminal sessions available');
+              }
+            }
+          }
+          
+          console.log(`[DEBUG] Using terminal session ${session.id} (${session.tab.title})`);
+          
+          // Generate unique markers for this command
           const timestamp = Date.now();
           const startMarker = `TABBY_OUTPUT_START_${timestamp}`;
           const endMarker = `TABBY_OUTPUT_END_${timestamp}`;
+          
+          // Track exit code
           let exitCode: number | null = null;
 
           // Create abort controller for this command
           let aborted = false;
           const abortHandler = () => {
             aborted = true;
+            // Do not send Ctrl+C here, just mark as aborted
           };
 
           // Set active command
@@ -366,7 +267,7 @@ export class ExecToolCategory extends BaseToolCategory {
           });
 
           // First determine which shell we're running in
-          const detectShellScript = this.getShellDetectionScript();
+          const detectShellScript = this.shellContext.getShellDetectionScript();
           
           // Send the detection script
           session.tab.sendInput(`\n${detectShellScript}\n`);
@@ -378,12 +279,15 @@ export class ExecToolCategory extends BaseToolCategory {
           const textBeforeSetup = this.getTerminalBufferText(session);
           
           // Determine shell type from output
-          const shellType = this.detectShellType(textBeforeSetup);
+          const shellType = this.shellContext.detectShellType(textBeforeSetup);
           console.log(`[DEBUG] Detected shell type: ${shellType}`);
           
-          // Get the appropriate scripts for this shell type
-          const { setupScript, cleanupScript, commandPrefix } = 
-              this.getShellScripts(shellType, startMarker, endMarker);
+          // Get the appropriate shell strategy
+          const shellStrategy = this.shellContext.getStrategy(shellType);
+          
+          // Get setup script and command prefix
+          const setupScript = shellStrategy.getSetupScript(startMarker, endMarker);
+          const commandPrefix = shellStrategy.getCommandPrefix();
           
           // Send the appropriate setup script
           session.tab.sendInput(`\n${setupScript}\n`);
@@ -416,7 +320,7 @@ export class ExecToolCategory extends BaseToolCategory {
                 startIndex = i;
                 commandStarted = true;
                 for (let j = startIndex + 1; j < lines.length; j++) {
-                  if (lines[j].startsWith(endMarker)) {
+                  if (lines[j].includes(endMarker)) {
                     endIndex = j;
                     commandFinished = true;
                     break;
@@ -434,28 +338,23 @@ export class ExecToolCategory extends BaseToolCategory {
                 .filter(line => !line.includes(startMarker) && !line.includes(endMarker))
                 .join('\n')
                 .trim();
-              output = commandOutput;
-              try {
-                exitCode = parseInt(lines[endIndex+1].split(':')[1].trim());
-              } catch (err) {
-                console.error(`[DEBUG] Error parsing exit code:`, err);
+              
+              // Extract exit code if available
+              for (let i = endIndex; i < Math.min(endIndex + 5, lines.length); i++) {
+                if (lines[i].startsWith('exit_code:')) {
+                  exitCode = parseInt(lines[i].split(':')[1].trim(), 10);
+                  break;
+                }
               }
+              
+              output = commandOutput;
               break;
             }
-
-            // Timeout after 30 seconds
-            if (Date.now() - timestamp > 30000) {
-              throw new Error('Command execution timed out after 30 seconds');
-            }
           }
-
-          // Cleanup hooks
-          session.tab.sendInput('\n' + cleanupScript + '\n');
 
           // Clear active command
           this.setActiveCommand(null);
 
-          // If aborted, get buffer from marker to end
           if (aborted) {
             console.log(`[DEBUG] Command was aborted, retrieving partial output`);
             
@@ -487,12 +386,11 @@ export class ExecToolCategory extends BaseToolCategory {
           }
 
           console.log(`[DEBUG] Command executed: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
-          return createSuccessResponse(output, );
+          return createSuccessResponse(output, { exitCode });
         } catch (err) {
-          console.error(`[DEBUG] Error capturing command output:`, err);
-          // Clear active command on error
+          console.error(`[DEBUG] Error executing command:`, err);
           this.setActiveCommand(null);
-          return createErrorResponse(`Failed to capture command output in session ${session.id} (${session.tab.title}): ${err.message || err}`);
+          return createErrorResponse(`Failed to execute command: ${err.message || err}`);
         }
       }
     };
@@ -517,71 +415,51 @@ export class ExecToolCategory extends BaseToolCategory {
           .describe('Ending line number from the bottom (1-based, default: -1 for all lines)')
       },
       handler: async (params, extra) => {
-        const {
-          tabId,
-          startLine = 1,
-          endLine = -1
-        } = params;
-
-        const sessions = this.findAndSerializeTerminalSessions();
-        const session = sessions.find(s => s.id === parseInt(tabId, 10));
-        
-        if (!session) {
-          return createErrorResponse('Invalid tab ID');
-        }
-
         try {
-          // Get terminal buffer content
-          let bufferText = "";
-          if (session.tab.frontend instanceof XTermFrontend) {
-            if (!session.tab.frontend.xterm['_serializeAddon']) {
-              const addon = new SerializeAddon();
-              session.tab.frontend.xterm.loadAddon(addon);
-              session.tab.frontend.xterm['_serializeAddon'] = addon;
-            }
-            bufferText = session.tab.frontend.xterm['_serializeAddon'].serialize() || '';
-            console.log(`[DEBUG] Buffer text retrieved (length: ${bufferText.length})`);
-          } else {
-            return createErrorResponse('Terminal frontend does not support buffer access');
+          const { tabId, startLine, endLine } = params;
+          
+          // Find all terminal sessions
+          const sessions = this.findAndSerializeTerminalSessions();
+          
+          // Find the requested session
+          const session = sessions.find(s => s.id.toString() === tabId);
+          if (!session) {
+            return createErrorResponse(`No terminal session found with ID ${tabId}`);
           }
-
-          // Clean ANSI codes for readability
-          const cleanBuffer = stripAnsi(bufferText);
-          const lines = cleanBuffer.split('\n');
+          
+          // Get terminal buffer
+          const text = this.getTerminalBufferText(session);
+          
+          // Split into lines
+          const lines = stripAnsi(text).split('\n');
           
           // Validate line ranges
+          if (startLine < 1) {
+            return createErrorResponse(`Invalid startLine: ${startLine}. Must be >= 1`);
+          }
+          
+          if (endLine !== -1 && endLine < startLine) {
+            return createErrorResponse(`Invalid endLine: ${endLine}. Must be >= startLine or -1`);
+          }
+          
+          // Calculate line indices from the bottom
+          // Note: lines are 1-based from the bottom, so we need to adjust
           const totalLines = lines.length;
-          
-          // Handle special case: endLine = -1 means all lines to the top
-          const effectiveEndLine = endLine === -1 ? totalLines : endLine;
-          
-          // Validate start and end lines
-          if (startLine > totalLines) {
-            return createErrorResponse(`startLine (${startLine}) exceeds total lines in buffer (${totalLines})`);
-          }
-          
-          if (effectiveEndLine > totalLines) {
-            return createErrorResponse(`endLine (${effectiveEndLine}) exceeds total lines in buffer (${totalLines})`);
-          }
-          
-          if (startLine > effectiveEndLine && effectiveEndLine !== -1) {
-            return createErrorResponse(`startLine (${startLine}) cannot be greater than endLine (${effectiveEndLine})`);
-          }
-          
-          // Calculate actual array indices (convert from 1-based to 0-based and from bottom to top)
-          const startIndex = totalLines - effectiveEndLine;
-          const endIndex = totalLines - startLine + 1;
+          const start = Math.max(0, totalLines - startLine);
+          const end = endLine === -1 ? totalLines : Math.min(totalLines, totalLines - (endLine - startLine) - 1);
           
           // Extract the requested lines
-          const selectedLines = lines.slice(startIndex, endIndex);
-          const output = selectedLines.join('\n');
+          const requestedLines = lines.slice(start, end);
           
-          console.log(`[DEBUG] Terminal buffer extracted: ${startLine}-${effectiveEndLine === totalLines ? 'all' : effectiveEndLine} (${selectedLines.length} lines)`);
-          
-          return createSuccessResponse(output);
+          return createJsonResponse({
+            lines: requestedLines,
+            totalLines,
+            startLine,
+            endLine: endLine === -1 ? totalLines : endLine
+          });
         } catch (err) {
-          console.error(`[DEBUG] Error retrieving terminal buffer:`, err);
-          return createErrorResponse(`Failed to retrieve terminal buffer: ${err.message || err}`);
+          console.error(`[DEBUG] Error getting terminal buffer:`, err);
+          return createErrorResponse(`Failed to get terminal buffer: ${err.message || err}`);
         }
       }
     };

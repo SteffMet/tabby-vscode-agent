@@ -59,33 +59,7 @@ mcpPlugin.startServer();
 
 ### Connect an AI to Control Your Terminal
 
-```typescript
-// Connect your AI assistant to the MCP server
-const mcpClient = new McpClient('http://localhost:3000');
-
-// Execute a command in terminal
-await mcpClient.tools.execCommand({
-  command: 'ls -la',
-  tabId: 'terminal-1'
-});
-
-// Get terminal buffer content
-const result = await mcpClient.tools.getTerminalBuffer({
-  tabId: 'terminal-1',
-  startLine: 1,
-  endLine: 10
-});
-```
-
 ### Retrieve SSH Session List
-
-```typescript
-// Get all SSH sessions
-const sessions = await mcpClient.tools.getSshSessionList();
-
-// Display sessions
-console.log(sessions);
-```
 
 ## ⚙️ Configuration
 
@@ -94,8 +68,8 @@ Configure the MCP server through the Tabby settings:
 ```json
 {
   "mcp": {
-    "port": 3000,
-    "host": "localhost",
+    "port": 3001,
+    "host": "localhost:3001",
     "enableLogging": true,
     "allowedOrigins": ["*"]
   }

@@ -18,10 +18,6 @@ export class McpToolbarButtonProvider extends ToolbarButtonProvider {
     }
     
     provide(): ToolbarButton[] {
-        if (!this.execCommandRunning) {
-            return [];
-        }
-        
         return [
             {
                 icon: `
@@ -30,9 +26,11 @@ export class McpToolbarButtonProvider extends ToolbarButtonProvider {
                     </svg>
                 `,
                 weight: 5,
-                title: 'Abort command',
+                title: this.execCommandRunning ? 'Abort command (running)' : 'MCP Status (idle)',
                 click: () => {
-                    this.execToolCategory.abortCurrentCommand();
+                    if (this.execCommandRunning) {
+                        this.execToolCategory.abortCurrentCommand();
+                    }
                 }
             }
         ];

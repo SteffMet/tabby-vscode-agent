@@ -55,7 +55,7 @@ export function createSuccessResponse(text: string, metadata?: Record<string, an
       type: "text",
       text
     }],
-    metadata
+    _meta: metadata
   };
 }
 

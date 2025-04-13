@@ -58,7 +58,7 @@ export class BashShellStrategy extends BaseShellStrategy {
   
   getSetupScript(startMarker: string, endMarker: string): string {
     const cleanup = this.getCleanupScript();
-    return `__TABBY_MARKER_EMITTED=0; function __tabby_cleanup() { ${cleanup} }; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(HISTTIMEFORMAT='' history 1 | awk '{$1=""; print substr($0,2)}'); if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; __tabby_cleanup; fi; fi; }; trap - DEBUG 2>/dev/null; PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g'); PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"`;
+    return `__TABBY_MARKER_EMITTED=0; function __tabby_cleanup() { ${cleanup} }; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(HISTTIMEFORMAT='' history 1 | awk '{$1=""; print substr($0,2)}'); if [[ "$last_cmd" == "echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; __tabby_cleanup; fi; fi; }; trap - DEBUG 2>/dev/null; PROMPT_COMMAND=$(echo "$PROMPT_COMMAND" | sed 's/__tabby_post_command;//g'); PROMPT_COMMAND="__tabby_post_command;$PROMPT_COMMAND"`;
   }
 }
 
@@ -76,7 +76,7 @@ export class ZshShellStrategy extends BaseShellStrategy {
   
   getSetupScript(startMarker: string, endMarker: string): string {
     const cleanup = this.getCleanupScript();
-    return `__TABBY_MARKER_EMITTED=0; function __tabby_cleanup() { ${cleanup} }; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(fc -ln -1); if [[ "$last_cmd" == *"echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; __tabby_cleanup; fi; fi; }; precmd_functions=(); precmd_functions=(__tabby_post_command)`;
+    return `__TABBY_MARKER_EMITTED=0; function __tabby_cleanup() { ${cleanup} }; function __tabby_post_command() { if [ $__TABBY_MARKER_EMITTED -eq 0 ]; then local exit_code=$?; local last_cmd=$(fc -ln -1); if [[ "$last_cmd" == "echo \\"${startMarker}\\""* ]]; then __TABBY_MARKER_EMITTED=1; echo "${endMarker}"; echo "exit_code: $exit_code"; __tabby_cleanup; fi; fi; }; precmd_functions=(); precmd_functions=(__tabby_post_command)`;
   }
 }
 

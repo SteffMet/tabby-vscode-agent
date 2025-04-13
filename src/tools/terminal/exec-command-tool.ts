@@ -57,7 +57,7 @@ export class ExecCommandTool extends BaseTool {
           // Generate unique markers for this command
           const timestamp = Date.now();
           const startMarker = `____________${timestamp}`;
-          const endMarker = `____________${timestamp}`;
+          const endMarker = `------------${timestamp}`;
           
           // Track exit code
           let exitCode: number | null = null;

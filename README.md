@@ -73,12 +73,29 @@ Configure the MCP server through the Tabby settings:
 {
   "mcp": {
     "port": 3001,
-    "host": "http://localhost:3001",
+    "host": "http://localhost:3001", // note: in development
     "enableLogging": false,
     "startOnBoot": true
   }
 }
 ```
+
+### MCP Client Configuration
+
+When connecting to the Tabby MCP server from an AI client (like Claude, GPT, etc.), use the following configuration:
+
+```json
+{
+  "mcpServers": {
+    "Tabby MCP": {
+      "url": "http://localhost:3001/sse"
+    }
+  }
+}
+```
+
+
+You may need to adjust the `url` parameter if you've configured a different host or port in your server settings.
 
 ## 📚 API Reference
 

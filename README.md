@@ -73,9 +73,9 @@ Configure the MCP server through the Tabby settings:
 {
   "mcp": {
     "port": 3001,
-    "host": "localhost:3001",
-    "enableLogging": true,
-    "allowedOrigins": ["*"]
+    "host": "http://localhost:3001",
+    "enableLogging": false,
+    "startOnBoot": true
   }
 }
 ```

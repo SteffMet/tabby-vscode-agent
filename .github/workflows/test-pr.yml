@@ -1,0 +1,47 @@
+name: Test Pull Request
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build with Docker
+        run: |
+          mkdir -p build
+          docker build -t tabby-mcp-test .
+          docker run -v $(pwd)/build:/output tabby-mcp-test
+        
+      # Testing the build output
+      - name: Setup Node.js for testing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Check build artifacts
+        run: |
+          ls -la build
+          if [ -d "build/dist" ]; then
+            echo "✅ Build successful - dist folder exists"
+          else
+            echo "❌ Build failed - dist folder missing"
+            exit 1
+          fi
+
+      # Additional lint checks on source files
+      - name: Lint check
+        run: |
+          if [ -f ".eslintrc" ] || [ -f ".eslintrc.js" ] || [ -f ".eslintrc.json" ]; then
+            npm install eslint --no-save
+            npx eslint src/ --ext .ts,.js,.tsx,.jsx
+          else
+            echo "No ESLint configuration found, skipping lint check"
+          fi

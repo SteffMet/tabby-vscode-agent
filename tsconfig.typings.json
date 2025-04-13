@@ -8,7 +8,7 @@
     "declarationDir": "./typings",
     "paths": {
       "tabby-*": ["../../tabby-*"],
-      "*": ["../../app/node_moduales/*"]
+      "*": ["../../app/node_modules/*"]
     }
   }
 }

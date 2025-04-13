@@ -140,4 +140,4 @@ mcp_llm.txt
 package-lock.json
 build-and-copy.sh
 typings
-
+build/

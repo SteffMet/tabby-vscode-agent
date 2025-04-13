@@ -53,7 +53,7 @@ export class BashShellStrategy extends BaseShellStrategy {
   }
   
   getCleanupScript(): string {
-    return `unset PROMPT_COMMAND; unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
+    return `unset PROMPT_COMMAND; unset __tabby_post_command; unset __TABBY_MARKER_EMITTED;`;
   }
   
   getSetupScript(startMarker: string, endMarker: string): string {
@@ -71,7 +71,7 @@ export class ZshShellStrategy extends BaseShellStrategy {
   }
   
   getCleanupScript(): string {
-    return `precmd_functions=(); unset __tabby_post_command; unset __TABBY_MARKER_EMITTED`;
+    return `precmd_functions=(); unset __tabby_post_command; unset __TABBY_MARKER_EMITTED;`;
   }
   
   getSetupScript(startMarker: string, endMarker: string): string {
@@ -89,7 +89,7 @@ export class ShShellStrategy extends BaseShellStrategy {
   }
   
   getCleanupScript(): string {
-    return `if [ -n "$OLD_PS1" ]; then PS1="$OLD_PS1"; unset OLD_PS1; fi; unset __tabby_post_command; rm -f "$__TABBY_CMD_FLAG" 2>/dev/null; unset __TABBY_CMD_FLAG`;
+    return `if [ -n "$OLD_PS1" ]; then PS1="$OLD_PS1"; unset OLD_PS1; fi; unset __tabby_post_command; rm -f "$__TABBY_CMD_FLAG" 2>/dev/null; unset __TABBY_CMD_FLAG;`;
   }
   
   getSetupScript(startMarker: string, endMarker: string): string {

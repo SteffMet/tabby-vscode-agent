@@ -1,0 +1,106 @@
+name: NPM Publish and GitHub Release
+
+on:
+  push:
+    branches:
+      - main
+    paths-ignore:
+      - '**.md'
+      - 'assets/**'
+      - '.github/ISSUE_TEMPLATE/**'
+
+permissions:
+  contents: write  # This is required for creating tags, pushing to repo, and creating releases
+
+jobs:
+  build-and-publish:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build with Docker
+        run: |
+          mkdir -p build
+          docker build -t tabby-mcp .
+          docker run -v $(pwd)/build:/output tabby-mcp
+
+      - name: Setup Node.js for publishing
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org/'
+
+      - name: Extract version
+        id: package_version
+        run: echo "version=$(node -p "require('./package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Publish to npm
+        run: |
+          cp -r build/* .
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create Tag
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git tag -a v${{ steps.package_version.outputs.version }} -m "Release v${{ steps.package_version.outputs.version }}"
+          git push https://${GITHUB_ACTOR}:${GITHUB_TOKEN}@github.com/${GITHUB_REPOSITORY}.git v${{ steps.package_version.outputs.version }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Create release notes file
+        run: |
+          cat > release-notes.md << 'EOL'
+          # Release v${{ steps.package_version.outputs.version }}
+
+          ## 🚀 Features
+
+          - 🤖 **AI Connection**: Seamlessly connect AI assistants to your terminal
+          - 🔌 **MCP Server**: Built-in Model Context Protocol server implementation
+          - 🖥️ **Terminal Control**: Allow AI to execute commands and read terminal output
+          - 🔍 **Session Management**: View and manage SSH sessions
+          - 🚫 **Command Abort**: Safely abort running commands
+          - 📋 **Buffer Access**: Retrieve terminal buffer content with flexible options
+
+          ## 📦 Installation
+
+          ```bash
+          npm install tabby-mcp --save
+          ```
+
+          ## 📋 Release Notes
+
+          Check the [CHANGELOG.md](https://github.com/thuanpham582002/tabby-mcp-server/blob/main/CHANGELOG.md) for detailed release notes.
+
+          ## 📄 Documentation
+
+          See the [README.md](https://github.com/thuanpham582002/tabby-mcp-server/blob/main/README.md) for full documentation.
+          EOL
+
+      - name: Create Archive of Build Files
+        run: |
+          cd build
+          zip -r ../tabby-mcp-v${{ steps.package_version.outputs.version }}.zip .
+          cd ..
+
+      - name: Create GitHub Release with Attachments
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create v${{ steps.package_version.outputs.version }} \
+            --title "Release v${{ steps.package_version.outputs.version }}" \
+            --notes-file release-notes.md \
+            tabby-mcp-v${{ steps.package_version.outputs.version }}.zip
+
+      - name: Upload Build Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: tabby-mcp-server-v${{ steps.package_version.outputs.version }}
+          path: build/
+          if-no-files-found: error

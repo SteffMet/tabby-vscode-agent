@@ -56,8 +56,8 @@ export class ExecCommandTool extends BaseTool {
           
           // Generate unique markers for this command
           const timestamp = Date.now();
-          const startMarker = `TABBY_OUTPUT_START_${timestamp}`;
-          const endMarker = `TABBY_OUTPUT_END_${timestamp}`;
+          const startMarker = `____________${timestamp}`;
+          const endMarker = `____________${timestamp}`;
           
           // Track exit code
           let exitCode: number | null = null;

@@ -26,34 +26,32 @@
 - [Configuration](#configuration)
 - [API Reference](#api-reference)
 - [Contributing](#contributing)
+  - [Continuous Integration](#continuous-integration)
 - [License](#license)
 
 ## 🔧 Installation
 
-```bash
-# Install via npm
-npm install tabby-mcp --save
+### Using Docker
 
-# Or using yarn
-yarn add tabby-mcp
+You can build and install the plugin using Docker with the following command:
+
+```bash
+git clone https://github.com/thuanpham582002/tabby-mcp-server.git
+cd tabby-mcp-server
+# Build the Docker image
+docker build -t tabby-mcp . && docker run -v $(pwd)/build:/output tabby-mcp
+bash scripts/copy_to_plugin_folder.sh
 ```
+
+This command builds a Docker image tagged as 'tabby-mcp' and runs a container from this image, mounting your local 'build' directory to '/output' in the container. The script `scripts/copy_to_plugin_folder.sh` will copy the built files to the Tabby plugin folder.
+
+> **Note:** Our CI/CD workflows on GitHub also use this Docker-based build process to ensure consistency between local development and production releases.
 
 ## 🚀 Quick Start
 
 1. Install the plugin
 2. Configure your Tabby environment
-3. Connect your AI assistant
-
-```typescript
-// Import the plugin
-import { TabbyMcpPlugin } from 'tabby-mcp';
-
-// Initialize
-const mcpPlugin = new TabbyMcpPlugin();
-
-// Start the MCP server
-mcpPlugin.startServer();
-```
+3. Connect to MCP server from any of the supported clients listed at https://modelcontextprotocol.io/clients
 
 ## 💻 Usage Examples
 
@@ -99,29 +97,25 @@ Contributions are welcome! Here's how you can help:
 
 See the [contributing guidelines](CONTRIBUTING.md) for more details.
 
+### Continuous Integration
+
+Our project uses GitHub Actions for CI/CD with Docker-based builds:
+
+- **Pull Requests**: Automatically built and tested using Docker to ensure compatibility
+- **Main Branch**: Builds with Docker, publishes to npm, and creates GitHub releases
+- **Benefits**: Consistent environment across development, testing, and production
+
+To set up the CI/CD pipeline in your fork:
+
+1. Configure the required secrets in your repository settings:
+   - `NPM_TOKEN`: Your npm access token for publishing
+   - `GITHUB_TOKEN`: Automatically provided by GitHub Actions
+
+2. The workflows will automatically run on push and pull request events.
+
 ## 📝 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## 🖼️ Demo Assets
-
-The project includes an `assets` directory structure for storing demo media files:
-
-```
-assets/
-├── images/    # Screenshots and diagrams
-├── videos/    # Video tutorials and demos
-└── gifs/      # Animated GIFs showing features
-```
-
-When adding demo media:
-
-- Place demonstration GIFs in `assets/gifs/`
-- Add screenshots in `assets/images/`
-- Store video tutorials in `assets/videos/`
-- Reference them in documentation using relative paths
-
-For guidelines on creating effective demo media, see [assets/README.md](assets/README.md).
 
 ---
 

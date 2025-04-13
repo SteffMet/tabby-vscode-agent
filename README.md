@@ -13,7 +13,7 @@
 
 Watch the full video demonstration of Tabby-MCP in action:
 
-https://raw.githubusercontent.com/thuanpham582002/tabby-mcp-server/main/assets/videos/demo-tabby-mcp.mp4
+[![Tabby MCP Plugin - AI Terminal Integration Demo](https://img.youtube.com/vi/uFWBGiD4x9c/0.jpg)](https://youtu.be/uFWBGiD4x9c)
 
 ## ✨ Features
 

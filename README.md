@@ -9,6 +9,12 @@
 
 ![Demo](https://raw.githubusercontent.com/thuanpham582002/tabby-mcp-server/main/assets/demo.gif)
 
+## 📹 Video Demo
+
+Watch the full video demonstration of Tabby-MCP in action:
+
+https://raw.githubusercontent.com/thuanpham582002/tabby-mcp-server/main/assets/videos/demo-tabby-mcp.mp4
+
 ## ✨ Features
 
 - 🤖 **AI Connection**: Seamlessly connect AI assistants to your terminal

@@ -4,19 +4,25 @@ import { createErrorResponse, createJsonResponse, createSuccessResponse } from '
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
+import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
 
 /**
  * Tool for executing a command in a terminal
  */
 export class ExecCommandTool extends BaseTool {
-  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService) {
+  // Maximum number of lines to return in a single response
+  private readonly MAX_LINES_PER_RESPONSE = 250;
+  private outputStorage: CommandOutputStorageService;
+  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService, outputStorage?: CommandOutputStorageService) {
     super(logger);
+    // If outputStorage is not provided, create a new instance
+    this.outputStorage = outputStorage || new CommandOutputStorageService(logger);
   }
 
   getTool() {
     return {
       name: 'exec_command',
-      description: 'Execute a command in a terminal session and return the output',
+      description: 'Execute a command in a terminal session and return the output. For long outputs, the command ID is returned which can be used with get_command_output tool to retrieve the full output with pagination.',
       schema: {
         command: z.string().describe('Command to execute in the terminal'),
         tabId: z.string().optional().describe('Tab ID to execute in, get from get_ssh_session_list')
@@ -110,7 +116,7 @@ export class ExecCommandTool extends BaseTool {
 
           // Execute the command with the appropriate prefix
           session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command}\n`);
-          
+
           // Wait for command output
           let output = '';
           let commandStarted = false;
@@ -205,11 +211,67 @@ export class ExecCommandTool extends BaseTool {
               output = cleanTextAfter;
             }
 
-            return createJsonResponse({ output, promptShell, exitCode, aborted: true });
+            // Store the output in the storage service
+            const outputId = this.outputStorage.storeOutput({
+              command,
+              output,
+              promptShell,
+              exitCode,
+              timestamp: Date.now(),
+              aborted: true,
+              tabId: session.id
+            });
+
+            // Return a preview of the output with the ID
+            const previewLength = 250;
+            const outputPreview = output.length > previewLength
+              ? output.substring(0, previewLength) + '...'
+              : output;
+
+            return createJsonResponse({
+              output: outputPreview,
+              promptShell,
+              exitCode,
+              aborted: true,
+              outputId,
+              message: `Output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
+            });
           }
 
           this.logger.info(`Command executed: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
-          return createJsonResponse({ output, promptShell, exitCode});
+
+          // Store the output in the storage service
+          const outputId = this.outputStorage.storeOutput({
+            command,
+            output,
+            promptShell,
+            exitCode,
+            timestamp: Date.now(),
+            aborted: false,
+            tabId: session.id
+          });
+
+          // Return a preview of the output with the ID
+          const previewLength = 250;
+          const outputLines = output.split('\n');
+          const totalLines = outputLines.length;
+
+          let outputPreview = output;
+          let message = '';
+
+          // If output is too long, provide a preview
+          if (output.length > previewLength) {
+            outputPreview = output.substring(0, previewLength) + '...';
+            message = `Output is too long (${totalLines} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`;
+          }
+
+          return createJsonResponse({
+            output: outputPreview,
+            promptShell,
+            exitCode,
+            outputId,
+            message
+          });
         } catch (err) {
           this.logger.error(`Error executing command:`, err);
           this.execToolCategory.setActiveCommand(null);

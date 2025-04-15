@@ -6,11 +6,13 @@ import { SerializeAddon } from '@xterm/addon-serialize';
 import { BehaviorSubject } from 'rxjs';
 import { ShellContext } from './shell-strategy';
 import { McpLoggerService } from '../services/mcpLogger.service';
-import { 
-  SshSessionListTool, 
-  AbortCommandTool, 
-  ExecCommandTool, 
-  GetTerminalBufferTool 
+import { CommandOutputStorageService } from '../services/commandOutputStorage.service';
+import {
+  SshSessionListTool,
+  AbortCommandTool,
+  ExecCommandTool,
+  GetTerminalBufferTool,
+  GetCommandOutputTool
 } from './terminal/';
 
 /**
@@ -40,11 +42,11 @@ export interface ActiveCommand {
 @Injectable({ providedIn: 'root' })
 export class ExecToolCategory extends BaseToolCategory {
   name: string = 'exec';
-  
+
   // Track active command execution
   private _activeCommand: ActiveCommand | null = null;
   private _activeCommandSubject = new BehaviorSubject<ActiveCommand | null>(null);
-  
+
   // Observable for UI to subscribe to
   public readonly activeCommand$ = this._activeCommandSubject.asObservable();
 
@@ -53,12 +55,12 @@ export class ExecToolCategory extends BaseToolCategory {
 
   constructor(private app: AppService, logger: McpLoggerService) {
     super(logger);
-    
+
     // Log discovered terminal sessions for debugging
     this.findAndSerializeTerminalSessions().forEach(session => {
       this.logger.debug(`Found session: ${session.id}, ${session.tab.title}`);
     });
-    
+
     // Initialize and register all tools
     this.initializeTools();
   }
@@ -67,17 +69,22 @@ export class ExecToolCategory extends BaseToolCategory {
    * Initialize and register all tools
    */
   private initializeTools(): void {
+    // Create shared storage service for command outputs
+    const commandOutputStorage = new CommandOutputStorageService(this.logger);
+
     // Create tool instances
     const sshSessionListTool = new SshSessionListTool(this, this.logger);
     const abortCommandTool = new AbortCommandTool(this, this.logger);
-    const execCommandTool = new ExecCommandTool(this, this.logger);
+    const execCommandTool = new ExecCommandTool(this, this.logger, commandOutputStorage);
     const getTerminalBufferTool = new GetTerminalBufferTool(this, this.logger);
+    const getCommandOutputTool = new GetCommandOutputTool(this.logger, commandOutputStorage);
 
     // Register tools
     this.registerTool(sshSessionListTool.getTool());
     this.registerTool(abortCommandTool.getTool());
     this.registerTool(execCommandTool.getTool());
     this.registerTool(getTerminalBufferTool.getTool());
+    this.registerTool(getCommandOutputTool.getTool());
   }
 
   /**
@@ -146,18 +153,18 @@ export class ExecToolCategory extends BaseToolCategory {
         this.logger.error(`No xterm frontend available for session ${session.id}`);
         return '';
       }
-      
+
       // Check if serialize addon is already registered
       let serializeAddon = (frontend.xterm as any)._addonManager._addons.find(
         addon => addon.instance instanceof SerializeAddon
       )?.instance;
-      
+
       // If not, register it
       if (!serializeAddon) {
         serializeAddon = new SerializeAddon();
         frontend.xterm.loadAddon(serializeAddon);
       }
-      
+
       // Get the terminal content
       return serializeAddon.serialize();
     } catch (err) {

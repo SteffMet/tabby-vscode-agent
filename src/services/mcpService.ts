@@ -104,6 +104,33 @@ export class McpService {
       this.logger.info(`Received message for sessionId ${sessionId}`);
       await this.transports[sessionId].handlePostMessage(req, res);
     });
+  
+    // Configure API endpoints for tool access via HTTP
+    this.configureToolEndpoints();
+  }
+
+  /**
+   * Configure API endpoints for tool access via HTTP
+   */
+  private configureToolEndpoints(): void {
+    console.log('Configuring tool endpoints...');
+    // Add API endpoints for each tool for direct HTTP access
+    this.toolCategories.forEach(category => {
+      category.mcpTools.forEach(tool => {
+        console.log(`Configuring endpoint for tool: ${tool.name}`);
+        this.app.post(`/api/tool/${tool.name}`, express.json(), async (req: Request, res: Response) => {
+          try {
+            // Explicitly cast the body to any to match the handler's expected parameter type
+            const params: any = req.body;
+            const result = await tool.handler({}, params);
+            res.json(result);
+          } catch (error) {
+            this.logger.error(`Error executing tool ${tool.name}:`, error);
+            res.status(500).json({ error: error.message });
+          }
+        });
+      });
+    });
   }
 
   /**

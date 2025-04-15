@@ -23,7 +23,9 @@ export class ExecCommandTool extends BaseTool {
       },
       handler: async (params, extra) => {
         try {
+          console.log('Params:', JSON.stringify(params));
           const { command, tabId } = params;
+          console.log(`Executing command: ${command}, tabId: ${tabId}`);
           
           // Check if a command is already running
           if (this.execToolCategory.activeCommand) {

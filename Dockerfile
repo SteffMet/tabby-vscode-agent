@@ -30,9 +30,11 @@ WORKDIR /tabby
 COPY --from=builder-tabby /tabby .
 
 WORKDIR /tabby/tabby-mcp
-COPY . .
-RUN npm install --legacy-peer-deps && npm run build
+COPY package*.json ./
+RUN npm ci --legacy-peer-deps
 
+COPY . .
+RUN npm run build
 # === Stage 4: Production image ===
 FROM node:22-slim AS production
 

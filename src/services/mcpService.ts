@@ -11,6 +11,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { ConfigService } from 'tabby-core';
 import * as http from 'http';
 import { McpLoggerService } from './mcpLogger.service';
+import { log } from 'console';
 
 /**
  * The main MCP server service for Tabby
@@ -122,7 +123,8 @@ export class McpService {
           try {
             // Explicitly cast the body to any to match the handler's expected parameter type
             const params: any = req.body;
-            const result = await tool.handler({}, params);
+            this.logger.info(`Executing tool ${tool.name} with params: ${JSON.stringify(params)}`);  
+            const result = await tool.handler(params, {});
             res.json(result);
           } catch (error) {
             this.logger.error(`Error executing tool ${tool.name}:`, error);

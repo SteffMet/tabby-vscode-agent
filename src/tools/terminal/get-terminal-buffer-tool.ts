@@ -9,6 +9,8 @@ import { McpLoggerService } from '../../services/mcpLogger.service';
  * Tool for getting terminal buffer content with line range options
  */
 export class GetTerminalBufferTool extends BaseTool {
+  private readonly MAX_LINES = 200;
+
   constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService) {
     super(logger);
   }
@@ -16,7 +18,7 @@ export class GetTerminalBufferTool extends BaseTool {
   getTool() {
     return {
       name: 'get_terminal_buffer',
-      description: 'Get terminal buffer content with options to retrieve specific line ranges from the bottom',
+      description: 'Get terminal buffer content with options to retrieve specific line ranges from the bottom. Max lines: 200',
       schema: {
         tabId: z.string().describe('Tab ID to get buffer from, get from get_ssh_session_list'),
         startLine: z.number().int().min(1).optional().default(1)
@@ -39,9 +41,12 @@ export class GetTerminalBufferTool extends BaseTool {
           
           // Get terminal buffer
           const text = this.execToolCategory.getTerminalBufferText(session);
+          if (!text) {
+            return createErrorResponse('Failed to get terminal buffer text');
+          }
           
-          // Split into lines
-          const lines = stripAnsi(text).split('\n');
+          // Split into lines and remove empty lines
+          const lines = stripAnsi(text).split('\n').filter(line => line.trim().length > 0);
           
           // Validate line ranges
           if (startLine < 1) {
@@ -51,21 +56,23 @@ export class GetTerminalBufferTool extends BaseTool {
           if (endLine !== -1 && endLine < startLine) {
             return createErrorResponse(`Invalid endLine: ${endLine}. Must be >= startLine or -1`);
           }
+
+          const totalLines = lines.length;
           
           // Calculate line indices from the bottom
-          // Note: lines are 1-based from the bottom, so we need to adjust
-          const totalLines = lines.length;
           const start = Math.max(0, totalLines - startLine);
-          const end = endLine === -1 ? totalLines : Math.min(totalLines, totalLines - (endLine - startLine) - 1);
+          const end = endLine === -1 
+            ? Math.max(start - this.MAX_LINES, 0) 
+            : Math.max(0, start - endLine);
           
           // Extract the requested lines
-          const requestedLines = lines.slice(start, end);
+          const requestedLines = lines.slice(end, start);
           
           return createJsonResponse({
             lines: requestedLines,
             totalLines,
             startLine,
-            endLine: endLine === -1 ? totalLines : endLine
+            endLine: endLine === -1 ? Math.min(startLine + this.MAX_LINES - 1, totalLines) : endLine
           });
         } catch (err) {
           this.logger.error(`Error getting terminal buffer:`, err);

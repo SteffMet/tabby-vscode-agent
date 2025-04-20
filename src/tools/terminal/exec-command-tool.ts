@@ -5,6 +5,7 @@ import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
+import { escapeShellString } from '../../utils/escapeShellString';
 
 /**
  * Tool for executing a command in a terminal
@@ -88,18 +89,23 @@ export class ExecCommandTool extends BaseTool {
             abort: abortHandler
           });
 
-          // First determine which shell we're running in
+          // First determine which shell we're running in using read to hide commands
           const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
-
-          // Send the detection script
-          session.tab.sendInput(`\n${detectShellScript}\n`);
-
+          
+          session.tab.sendInput('\x03');
+          
+          // First send a read command that will hide the detection script - more shell compatible approach
+          session.tab.sendInput(`\nstty -echo; read detect_shell; stty echo; eval "$detect_shell"\n`);
+          
+          // Send the detection script as input to the read command (will be hidden)
+          session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
+          
           // Wait a moment for the shell type to be detected
           await new Promise(resolve => setTimeout(resolve, 100));
-
+          
           // Get terminal buffer to check shell type
           const textBeforeSetup = this.execToolCategory.getTerminalBufferText(session);
-
+          
           // Determine shell type from output
           const shellType = this.execToolCategory.shellContext.detectShellType(textBeforeSetup);
           this.logger.info(`Detected shell type: ${shellType}`);
@@ -111,11 +117,21 @@ export class ExecCommandTool extends BaseTool {
           const setupScript = shellStrategy.getSetupScript(startMarker, endMarker);
           const commandPrefix = shellStrategy.getCommandPrefix();
 
-          // Send the appropriate setup script
-          session.tab.sendInput(`\n${setupScript}\n`);
+          // Send the setup script using read to hide it - more shell compatible approach
+          session.tab.sendInput(`stty -echo; read setup_script; stty echo; eval "$setup_script"\n`);
+          await new Promise(resolve => setTimeout(resolve, 100));
 
-          // Execute the command with the appropriate prefix
-          session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command}\n`);
+          // Send the actual setup script (will be hidden by read)
+          session.tab.sendInput(`${escapeShellString(setupScript)}\n`);
+          
+          // Wait for setup to complete
+          await new Promise(resolve => setTimeout(resolve, 100));
+
+          // Execute the command with markers
+          session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command}`);
+          await new Promise(resolve => setTimeout(resolve, 500));
+          session.tab.sendInput(`\n`);
+
 
           // Wait for command output
           let output = '';

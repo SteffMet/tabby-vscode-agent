@@ -93,7 +93,6 @@ export class ExecCommandTool extends BaseTool {
           const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
           
           session.tab.sendInput('\x03');
-          
           // First send a read command that will hide the detection script - more shell compatible approach
           session.tab.sendInput(`\nstty -echo; read detect_shell; stty echo; eval "$detect_shell"\n`);
           
@@ -126,10 +125,19 @@ export class ExecCommandTool extends BaseTool {
           
           // Wait for setup to complete
           await new Promise(resolve => setTimeout(resolve, 100));
-
+          
+          let tmpMarker = `_T${timestamp}`;
           // Execute the command with markers
-          session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command}`);
-          await new Promise(resolve => setTimeout(resolve, 500));
+          session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command} #${tmpMarker}`);
+
+          let timeout = 10000; // 10 seconds
+          while (timeout > 0 && !aborted) {
+            await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
+            if (this.execToolCategory.getTerminalBufferText(session).includes(tmpMarker)) {
+              break;
+            }
+            timeout -= 100;
+          }
           session.tab.sendInput(`\n`);
 
 

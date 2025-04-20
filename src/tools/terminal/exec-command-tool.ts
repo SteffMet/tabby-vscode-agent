@@ -237,20 +237,21 @@ export class ExecCommandTool extends BaseTool {
               aborted: true,
               tabId: session.id
             });
-
-            // Return a preview of the output with the ID
-            const previewLength = 250;
-            const outputPreview = output.length > previewLength
-              ? output.substring(0, previewLength) + '...'
-              : output;
+          
+            const outputLines = output.split('\n');
+            if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
+              output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
+            }
 
             return createJsonResponse({
-              output: outputPreview,
+              output: output,
               promptShell,
               exitCode,
               aborted: true,
               outputId,
-              message: `Output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
+              message: outputLines.length > this.MAX_LINES_PER_RESPONSE
+              ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
+              : '',
             });
           }
 
@@ -267,26 +268,20 @@ export class ExecCommandTool extends BaseTool {
             tabId: session.id
           });
 
-          // Return a preview of the output with the ID
-          const previewLength = 250;
           const outputLines = output.split('\n');
-          const totalLines = outputLines.length;
-
-          let outputPreview = output;
-          let message = '';
-
-          // If output is too long, provide a preview
-          if (output.length > previewLength) {
-            outputPreview = output.substring(0, previewLength) + '...';
-            message = `Output is too long (${totalLines} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`;
+          if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
+            output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
           }
 
           return createJsonResponse({
-            output: outputPreview,
+            output: output,
             promptShell,
             exitCode,
+            aborted: true,
             outputId,
-            message
+            message: outputLines.length > this.MAX_LINES_PER_RESPONSE
+            ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
+            : '',
           });
         } catch (err) {
           this.logger.error(`Error executing command:`, err);

@@ -61,7 +61,7 @@ export class McpService {
         tool.schema as z.ZodRawShape, 
         tool.handler
       );
-      console.log(`Registered tool: ${tool.name} from category: ${category.name}`);
+      this.logger.info(`Registered tool: ${tool.name} from category: ${category.name} with schema: ${JSON.stringify(tool.schema)}`);
     });
   }
 

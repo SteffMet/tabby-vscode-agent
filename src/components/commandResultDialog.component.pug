@@ -28,14 +28,29 @@
     pre.form-control.instruction-preview {{originalInstruction}}
 
   .form-group
-    label Your Message/Instructions
+    label(style='display: {{isRejectMode ? "none" : "block"}}') Your Message/Instructions
+    label.text-danger(style='display: {{!isRejectMode ? "none" : "block"}}') Reason for Rejection
     textarea.form-control(
+      #messageTextarea
       [(ngModel)]='userMessage',
       rows='4',
-      placeholder='Enter your message or instructions here...'
+      placeholder='{{isRejectMode ? "Enter your reason for rejecting this command..." : "Enter your message or instructions here..."}}',
+      class='{{isRejectMode ? "border-danger" : ""}}'
     )
 
 .modal-footer
-  button.btn.btn-secondary((click)='cancel()') Cancel
-  button.btn.btn-danger.mr-2((click)='reject()') Reject
-  button.btn.btn-primary((click)='accept()') Accept
+  button.btn.btn-secondary((click)='cancel()')
+    span Cancel
+    small.text-muted (Esc)
+
+  button.btn.btn-outline-secondary.mr-2((click)='toggleRejectMode()', style='display: {{isRejectMode ? "inline-block" : "none"}}')
+    span Cancel Rejection
+
+  button.btn.btn-danger.mr-2((click)='reject()')
+    span(style='display: {{!isRejectMode ? "inline" : "none"}}') Reject
+    span(style='display: {{isRejectMode ? "inline" : "none"}}') Confirm Rejection
+    small.text-muted (R)
+
+  button.btn.btn-primary((click)='accept()')
+    span Accept
+    small.text-muted (Enter)

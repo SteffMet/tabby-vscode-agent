@@ -1,5 +1,8 @@
-import { Component, Input } from '@angular/core';
-import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
+import { Component, Input, NgModule, ViewChild, ElementRef, AfterViewInit, HostListener, OnDestroy } from '@angular/core';
+import { FormsModule } from '@angular/forms';
+import { NgbActiveModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
+import { CommonModule } from '@angular/common';
+import { HotkeysService } from 'tabby-core';
 
 /**
  * Dialog component for displaying command execution results
@@ -7,7 +10,7 @@ import { NgbActiveModal } from '@ng-bootstrap/ng-bootstrap';
 @Component({
   templateUrl: './commandResultDialog.component.pug',
 })
-export class CommandResultDialogComponent {
+export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
   @Input() command: string;
   @Input() output: string;
   @Input() exitCode: number | null;
@@ -20,14 +23,123 @@ export class CommandResultDialogComponent {
   // Rejection message
   rejectionMessage: string = '';
 
+  // Flag to show if we're in reject mode
+  isRejectMode: boolean = false;
+
+  // Reference to the message textarea
+  @ViewChild('messageTextarea') messageTextareaRef: ElementRef<HTMLTextAreaElement>;
+
+  // Track if hotkeys are paused
+  private hotkeysPaused = false;
+
   constructor(
-    public modal: NgbActiveModal
+    public modal: NgbActiveModal,
+    private hotkeysService: HotkeysService
   ) { }
+
+  /**
+   * After view init, focus the textarea and pause hotkeys
+   */
+  ngAfterViewInit(): void {
+    setTimeout(() => {
+      // Focus the dialog element to capture keyboard events
+      if (this.modal) {
+        const modalElement = document.querySelector('.modal-content') as HTMLElement;
+        if (modalElement) {
+          modalElement.focus();
+        }
+      }
+      // Pause hotkeys while dialog is open
+      this.pauseHotkeys();
+    }, 100);
+  }
+
+  /**
+   * Pause hotkeys when the dialog is focused
+   */
+  pauseHotkeys(): void {
+    if (!this.hotkeysPaused) {
+      this.hotkeysService.disable();
+      this.hotkeysPaused = true;
+    }
+  }
+
+  /**
+   * Restore hotkeys when the dialog is closed
+   */
+  resumeHotkeys(): void {
+    if (this.hotkeysPaused) {
+      this.hotkeysService.enable();
+      this.hotkeysPaused = false;
+    }
+  }
+
+  /**
+   * Handle escape key to close dialog or cancel reject mode
+   */
+  @HostListener('document:keydown.escape')
+  onEscapePressed(): void {
+    const modalElement = document.querySelector('.modal-content') as HTMLElement;
+    if (modalElement) {
+      if (document.activeElement !== modalElement) {
+        modalElement.focus();
+        return;
+      }
+    }
+    if (this.isRejectMode) {
+      this.toggleRejectMode();
+    } else {
+      this.cancel();
+    }
+  }
+
+  /**
+   * Handle R key to toggle reject mode
+   */
+  @HostListener('document:keydown.r', ['$event'])
+  onRPressed(event: KeyboardEvent): void {
+    // Only handle if not in a text input
+    if (document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    event.preventDefault();
+    this.reject();
+  }
+
+  /**
+   * Handle Enter key to accept
+   */
+  @HostListener('document:keydown.enter', ['$event'])
+  onEnterPressed(event: KeyboardEvent): void {
+    // Only handle if not in a text input
+    if (document.activeElement instanceof HTMLInputElement ||
+        document.activeElement instanceof HTMLTextAreaElement) {
+      return;
+    }
+
+    event.preventDefault();
+    // Always call accept, which will handle the mode switching if needed
+    this.accept();
+  }
+
+  // Removed duplicate handler
+
+  // Removed duplicate handler
 
   /**
    * Accept the command result with user message
    */
   accept(): void {
+    // If in reject mode, switch to accept mode first
+    if (this.isRejectMode) {
+      this.toggleRejectMode();
+      return;
+    }
+
+    // If already in accept mode, submit the acceptance
+    this.resumeHotkeys();
     this.modal.close({
       accepted: true,
       userMessage: this.userMessage
@@ -35,24 +147,85 @@ export class CommandResultDialogComponent {
   }
 
   /**
-   * Show rejection dialog
+   * Toggle rejection mode
    */
-  async reject(): Promise<void> {
-    // Create a simple prompt for rejection message
-    const rejectionMessage = prompt('Please enter a reason for rejection:');
+  toggleRejectMode(): void {
+    this.isRejectMode = !this.isRejectMode;
 
-    if (rejectionMessage !== null) {
-      this.modal.close({
-        accepted: false,
-        rejectionMessage: rejectionMessage
-      });
+    if (this.isRejectMode) {
+      // If entering reject mode, copy current message to rejection message
+      this.rejectionMessage = this.userMessage;
+      this.userMessage = '';
+
+      // Focus the textarea after a short delay
+      setTimeout(() => {
+        if (this.messageTextareaRef?.nativeElement) {
+          this.messageTextareaRef.nativeElement.focus();
+        }
+      }, 100);
+    } else {
+      // If exiting reject mode, restore previous message
+      this.userMessage = this.rejectionMessage;
+      this.rejectionMessage = '';
     }
+  }
+
+  /**
+   * Submit rejection with message
+   */
+  reject(): void {
+    if (!this.isRejectMode) {
+      // If not in reject mode, toggle to reject mode
+      this.toggleRejectMode();
+      return;
+    }
+
+    // If already in reject mode, submit the rejection
+    if (!this.userMessage.trim()) {
+      // If no reason provided, ask for one
+      alert('Please provide a reason for rejection.');
+      return;
+    }
+
+    this.resumeHotkeys();
+    this.modal.close({
+      accepted: false,
+      rejectionMessage: this.userMessage
+    });
   }
 
   /**
    * Cancel and close the dialog
    */
   cancel(): void {
+    this.resumeHotkeys();
     this.modal.close();
   }
+
+  /**
+   * Clean up when component is destroyed
+   */
+  ngOnDestroy(): void {
+    this.resumeHotkeys();
+  }
 }
+
+/**
+ * Module for CommandResultDialogComponent
+ * This allows the component to be used with NgModel
+ */
+@NgModule({
+  imports: [
+    CommonModule,
+    FormsModule,
+    NgbModule
+  ],
+  declarations: [
+    CommandResultDialogComponent
+  ],
+  exports: [
+    CommandResultDialogComponent
+  ]
+  // HotkeysService is provided at the root level
+})
+export class CommandResultDialogModule { }

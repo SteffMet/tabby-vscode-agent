@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { AppService, ConfigService, HostWindowService, SplitTabComponent } from 'tabby-core';
+import { AppService, BaseTabComponent, ConfigService, HostWindowService, SplitTabComponent } from 'tabby-core';
 import { BaseTerminalTabComponent, XTermFrontend } from 'tabby-terminal';
 import { BaseToolCategory } from './base-tool-category';
 import { SerializeAddon } from '@xterm/addon-serialize';
@@ -7,7 +7,7 @@ import { BehaviorSubject } from 'rxjs';
 import { ShellContext } from './shell-strategy';
 import { McpLoggerService } from '../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../services/commandOutputStorage.service';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { DialogService } from '../services/dialog.service';
 import {
   SshSessionListTool,
   AbortCommandTool,
@@ -21,6 +21,7 @@ import {
  */
 export interface BaseTerminalTabComponentWithId {
   id: number;
+  tabParent: BaseTabComponent;
   tab: BaseTerminalTabComponent<any>;
 }
 
@@ -58,8 +59,7 @@ export class ExecToolCategory extends BaseToolCategory {
     private app: AppService,
     logger: McpLoggerService,
     private config: ConfigService,
-    private hostWindow: HostWindowService,
-    private ngbModal: NgbModal
+    private dialogService: DialogService
   ) {
     super(logger);
 
@@ -86,8 +86,7 @@ export class ExecToolCategory extends BaseToolCategory {
       this,
       this.logger,
       this.config,
-      this.hostWindow,
-      this.ngbModal,
+      this.dialogService,
       this.app,
       commandOutputStorage
     );
@@ -138,10 +137,11 @@ export class ExecToolCategory extends BaseToolCategory {
   public findAndSerializeTerminalSessions(): BaseTerminalTabComponentWithId[] {
     const sessions: BaseTerminalTabComponentWithId[] = [];
     let id = 0;
-    this.app.tabs.forEach(tab => {
+    this.app.tabs.forEach((tab, tabIdx) => {
       if (tab instanceof BaseTerminalTabComponent) {
         sessions.push({
           id: id++,
+          tabParent: tab,
           tab: tab as BaseTerminalTabComponent<any>
         });
       } else if (tab instanceof SplitTabComponent) {
@@ -149,6 +149,7 @@ export class ExecToolCategory extends BaseToolCategory {
           .filter(childTab => childTab instanceof BaseTerminalTabComponent && (childTab as BaseTerminalTabComponent<any>).frontend !== undefined)
           .map(childTab => ({
             id: id++,
+            tabParent: tab,
             tab: childTab as BaseTerminalTabComponent<any>
           })));
       }

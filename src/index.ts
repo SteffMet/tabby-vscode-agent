@@ -11,8 +11,10 @@ import { McpSettingsTabProvider } from './settings';
 import { McpSettingsTabComponent } from './components/mcpSettingsTab.component';
 import { SettingsTabProvider } from 'tabby-settings';
 import { McpConfigProvider } from './services/mcpConfigProvider';
-import { ConfirmCommandDialogComponent } from './components/confirmCommandDialog.component';
-import { CommandResultDialogComponent } from './components/commandResultDialog.component';
+import { ConfirmCommandDialogModule } from './components/confirmCommandDialog.component';
+import { CommandResultDialogModule } from './components/commandResultDialog.component';
+import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
+import { DialogService } from './services/dialog.service';
 
 /**
  * Module for the MCP server integration
@@ -21,28 +23,28 @@ import { CommandResultDialogComponent } from './components/commandResultDialog.c
   imports: [
     CommonModule,
     FormsModule,
-    TabbyCoreModule
+    TabbyCoreModule,
+    NgbModule,
+    CommandResultDialogModule,
+    ConfirmCommandDialogModule
   ],
   // Xóa styleUrls ở đây
   providers: [
     McpService,
     McpLoggerService,
     ExecToolCategory,
+    DialogService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
   ],
   declarations: [
     ExecCommandButtonComponent,
-    McpSettingsTabComponent,
-    ConfirmCommandDialogComponent,
-    CommandResultDialogComponent
+    McpSettingsTabComponent
   ],
   entryComponents: [
     ExecCommandButtonComponent,
-    McpSettingsTabComponent,
-    ConfirmCommandDialogComponent,
-    CommandResultDialogComponent
+    McpSettingsTabComponent
   ],
   exports: [
     ExecCommandButtonComponent

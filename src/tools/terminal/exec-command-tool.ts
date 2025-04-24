@@ -2,14 +2,12 @@ import * as z from 'zod';
 import stripAnsi from 'strip-ansi';
 import { createErrorResponse, createJsonResponse, createSuccessResponse } from '../../type/types';
 import { BaseTool } from './base-tool';
-import { ExecToolCategory } from '../terminal';
+import { BaseTerminalTabComponentWithId, ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
 import { escapeShellString } from '../../utils/escapeShellString';
-import { AppService, ConfigService, HostWindowService } from 'tabby-core';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
-import { ConfirmCommandDialogComponent } from '../../components/confirmCommandDialog.component';
-import { CommandResultDialogComponent } from '../../components/commandResultDialog.component';
+import { AppService, ConfigService } from 'tabby-core';
+import { DialogService } from '../../services/dialog.service';
 
 /**
  * Tool for executing a command in a terminal
@@ -23,8 +21,7 @@ export class ExecCommandTool extends BaseTool {
     private execToolCategory: ExecToolCategory,
     logger: McpLoggerService,
     private config: ConfigService,
-    private hostWindow: HostWindowService,
-    private ngbModal: NgbModal,
+    private dialogService: DialogService,
     private app: AppService,
     outputStorage?: CommandOutputStorageService
   ) {
@@ -84,19 +81,34 @@ export class ExecCommandTool extends BaseTool {
           // Show confirmation dialog if enabled
           if (showConfirmationDialog) {
             try {
-              const modalRef = this.ngbModal.open(ConfirmCommandDialogComponent, { backdrop: 'static' });
-              modalRef.componentInstance.command = command;
-              modalRef.componentInstance.tabId = session.id;
-              modalRef.componentInstance.tabTitle = session.tab.title;
+              const result = await this.dialogService.showConfirmCommandDialog(
+                command,
+                session.id,
+                session.tab.title
+              );
 
-              const result = await modalRef.result;
               if (!result || !result.confirmed) {
-                this.logger.info('Command execution cancelled by user');
-                return createJsonResponse({
-                  output: 'Command execution cancelled by user',
-                  aborted: true,
-                  exitCode: null
-                });
+                // Check if it was rejected with a message
+                if (result && result.rejected && result.rejectMessage) {
+                  this.logger.info(`Command execution rejected by user: ${result.rejectMessage}`);
+                  return createJsonResponse({
+                    output: `Command execution rejected: ${result.rejectMessage}`,
+                    aborted: true,
+                    exitCode: null,
+                    userFeedback: {
+                      accepted: false,
+                      message: result.rejectMessage
+                    }
+                  });
+                } else {
+                  // Regular cancellation
+                  this.logger.info('Command execution cancelled by user');
+                  return createJsonResponse({
+                    output: 'Command execution cancelled by user',
+                    aborted: true,
+                    exitCode: null
+                  });
+                }
               }
             } catch (error) {
               this.logger.error('Error showing confirmation dialog:', error);
@@ -107,9 +119,8 @@ export class ExecCommandTool extends BaseTool {
           // Focus terminal if enabled
           if (autoFocusTerminal) {
             try {
-              this.hostWindow.bringToFront();
-              this.app.selectTab(session.tab);
-              session.tab.focus();
+              // First, select the tab to make it active
+              this.app.selectTab(session.tabParent);
             } catch (error) {
               this.logger.error('Error focusing terminal:', error);
               // Continue with execution if focus fails
@@ -238,7 +249,7 @@ export class ExecCommandTool extends BaseTool {
             // Extract output between markers
             if (commandStarted && commandFinished && startIndex !== -1 && endIndex !== -1) {
               const commandOutput = lines.slice(startIndex + 1, endIndex)
-                .filter(line => !line.includes(startMarker) && !line.includes(endMarker))
+                .filter((line: string) => !line.includes(startMarker) && !line.includes(endMarker))
                 .join('\n')
                 .trim();
 
@@ -280,7 +291,7 @@ export class ExecCommandTool extends BaseTool {
             if (startIndex !== -1) {
               // Get everything from start marker to end
               output = lines.slice(startIndex + 1)
-                .filter(line => !line.includes(startMarker))
+                .filter((line: string) => !line.includes(startMarker))
                 .join('\n')
                 .trim();
             } else {
@@ -308,17 +319,14 @@ export class ExecCommandTool extends BaseTool {
             const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
             if (showResultDialog) {
               try {
-                const modalRef = this.ngbModal.open(CommandResultDialogComponent, {
-                  backdrop: 'static',
-                  size: 'lg'
-                });
-                modalRef.componentInstance.command = command;
-                modalRef.componentInstance.output = output;
-                modalRef.componentInstance.exitCode = exitCode;
-                modalRef.componentInstance.aborted = true;
+                // Show the result dialog using the dialog service
+                const result = await this.dialogService.showCommandResultDialog(
+                  command,
+                  output,
+                  exitCode,
+                  true // aborted
+                );
 
-                // Wait for user to close the dialog or provide feedback
-                const result = await modalRef.result;
                 if (result) {
                   if (result.accepted && result.userMessage) {
                     // User accepted with a message
@@ -390,17 +398,14 @@ export class ExecCommandTool extends BaseTool {
           const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
           if (showResultDialog) {
             try {
-              const modalRef = this.ngbModal.open(CommandResultDialogComponent, {
-                backdrop: 'static',
-                size: 'lg'
-              });
-              modalRef.componentInstance.command = command;
-              modalRef.componentInstance.output = output;
-              modalRef.componentInstance.exitCode = exitCode;
-              modalRef.componentInstance.aborted = false;
+              // Show the result dialog using the dialog service
+              const result = await this.dialogService.showCommandResultDialog(
+                command,
+                output,
+                exitCode,
+                false // not aborted
+              );
 
-              // Wait for user to close the dialog or provide feedback
-              const result = await modalRef.result;
               if (result) {
                 if (result.accepted && result.userMessage) {
                   // User accepted with a message

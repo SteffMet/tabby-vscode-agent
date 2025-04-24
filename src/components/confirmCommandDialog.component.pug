@@ -1,0 +1,20 @@
+.modal-header
+  h5 Confirm Command Execution
+  button.btn-close((click)='cancel()')
+
+.modal-body
+  .alert.alert-info
+    i.fas.fa-info-circle.mr-2
+    span This command will be executed in the terminal.
+  
+  .form-group
+    label Terminal
+    .form-control-plaintext {{tabTitle || 'Current terminal'}}
+  
+  .form-group
+    label Command
+    pre.form-control.command-preview {{command}}
+
+.modal-footer
+  button.btn.btn-secondary((click)='cancel()') Cancel
+  button.btn.btn-primary((click)='confirm()') Execute

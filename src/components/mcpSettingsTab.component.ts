@@ -15,6 +15,12 @@ export class McpSettingsTabComponent implements OnInit {
     enableDebugLogging: boolean = false;
     startOnBoot: boolean = true;
 
+    // Pair Programming Mode settings
+    pairProgrammingEnabled: boolean = false;
+    autoFocusTerminal: boolean = true;
+    showConfirmationDialog: boolean = true;
+    showResultDialog: boolean = true;
+
     constructor(
         public config: ConfigService,
         private mcpService: McpService,
@@ -22,18 +28,18 @@ export class McpSettingsTabComponent implements OnInit {
     ) {
         console.log('McpSettingsTabComponent constructor');
     }
-    
+
     ngOnInit(): void {
         console.log('McpSettingsTabComponent initialized');
         // Initialize config
         this.initializeConfig();
-        
+
         // Load values from config
         this.loadConfigValues();
-        
+
         // Check server status
         this.updateServerStatus();
-        
+
         // Log initial state
         console.log('MCP Settings initial state:', {
             serverUrl: this.serverUrl,
@@ -43,7 +49,7 @@ export class McpSettingsTabComponent implements OnInit {
             configStore: this.config.store.mcp
         });
     }
-    
+
     private initializeConfig(): void {
         console.log('Initializing MCP config');
         try {
@@ -54,7 +60,22 @@ export class McpSettingsTabComponent implements OnInit {
                     enabled: true,
                     port: 3001,
                     serverUrl: 'http://localhost:3001',
-                    enableDebugLogging: false
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
+                this.config.save();
+            } else if (!this.config.store.mcp.pairProgrammingMode) {
+                // Initialize Pair Programming Mode settings if they don't exist
+                this.config.store.mcp.pairProgrammingMode = {
+                    enabled: false,
+                    autoFocusTerminal: true,
+                    showConfirmationDialog: true,
+                    showResultDialog: true
                 };
                 this.config.save();
             }
@@ -62,7 +83,7 @@ export class McpSettingsTabComponent implements OnInit {
             console.error('Error initializing MCP config:', error);
         }
     }
-    
+
     private loadConfigValues(): void {
         console.log('Loading MCP config values');
         try {
@@ -71,11 +92,24 @@ export class McpSettingsTabComponent implements OnInit {
                 this.port = this.config.store.mcp.port || 3001;
                 this.enableDebugLogging = !!this.config.store.mcp.enableDebugLogging;
                 this.startOnBoot = this.config.store.mcp.startOnBoot !== false; // Default to true if not set
+
+                // Load Pair Programming Mode settings
+                if (this.config.store.mcp.pairProgrammingMode) {
+                    this.pairProgrammingEnabled = !!this.config.store.mcp.pairProgrammingMode.enabled;
+                    this.autoFocusTerminal = this.config.store.mcp.pairProgrammingMode.autoFocusTerminal !== false; // Default to true
+                    this.showConfirmationDialog = this.config.store.mcp.pairProgrammingMode.showConfirmationDialog !== false; // Default to true
+                    this.showResultDialog = this.config.store.mcp.pairProgrammingMode.showResultDialog !== false; // Default to true
+                }
+
                 console.log('Loaded values:', {
                     serverUrl: this.serverUrl,
                     port: this.port,
                     enableDebugLogging: this.enableDebugLogging,
-                    startOnBoot: this.startOnBoot
+                    startOnBoot: this.startOnBoot,
+                    pairProgrammingEnabled: this.pairProgrammingEnabled,
+                    autoFocusTerminal: this.autoFocusTerminal,
+                    showConfirmationDialog: this.showConfirmationDialog,
+                    showResultDialog: this.showResultDialog
                 });
             } else {
                 console.warn('MCP config section not found');
@@ -84,7 +118,7 @@ export class McpSettingsTabComponent implements OnInit {
             console.error('Error loading MCP config values:', error);
         }
     }
-    
+
     saveServerUrl(): void {
         console.log(`Saving server URL: ${this.serverUrl}`);
         try {
@@ -98,7 +132,7 @@ export class McpSettingsTabComponent implements OnInit {
             console.error('Error saving server URL:', error);
         }
     }
-    
+
     savePort(): void {
         console.log(`Saving port: ${this.port}`);
         try {
@@ -172,6 +206,74 @@ export class McpSettingsTabComponent implements OnInit {
             this.logger.info(`Start on boot ${this.startOnBoot ? 'enabled' : 'disabled'}`);
         } catch (error) {
             console.error('Error toggling start on boot:', error);
+        }
+    }
+
+    togglePairProgrammingMode(): void {
+        console.log(`Toggling Pair Programming Mode to: ${this.pairProgrammingEnabled}`);
+        try {
+            if (!this.config.store.mcp) {
+                this.config.store.mcp = {};
+            }
+            if (!this.config.store.mcp.pairProgrammingMode) {
+                this.config.store.mcp.pairProgrammingMode = {};
+            }
+            this.config.store.mcp.pairProgrammingMode.enabled = this.pairProgrammingEnabled;
+            this.config.save();
+            this.logger.info(`Pair Programming Mode ${this.pairProgrammingEnabled ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error('Error toggling Pair Programming Mode:', error);
+        }
+    }
+
+    toggleAutoFocusTerminal(): void {
+        console.log(`Toggling Auto Focus Terminal to: ${this.autoFocusTerminal}`);
+        try {
+            if (!this.config.store.mcp) {
+                this.config.store.mcp = {};
+            }
+            if (!this.config.store.mcp.pairProgrammingMode) {
+                this.config.store.mcp.pairProgrammingMode = {};
+            }
+            this.config.store.mcp.pairProgrammingMode.autoFocusTerminal = this.autoFocusTerminal;
+            this.config.save();
+            this.logger.info(`Auto Focus Terminal ${this.autoFocusTerminal ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error('Error toggling Auto Focus Terminal:', error);
+        }
+    }
+
+    toggleShowConfirmationDialog(): void {
+        console.log(`Toggling Show Confirmation Dialog to: ${this.showConfirmationDialog}`);
+        try {
+            if (!this.config.store.mcp) {
+                this.config.store.mcp = {};
+            }
+            if (!this.config.store.mcp.pairProgrammingMode) {
+                this.config.store.mcp.pairProgrammingMode = {};
+            }
+            this.config.store.mcp.pairProgrammingMode.showConfirmationDialog = this.showConfirmationDialog;
+            this.config.save();
+            this.logger.info(`Show Confirmation Dialog ${this.showConfirmationDialog ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error('Error toggling Show Confirmation Dialog:', error);
+        }
+    }
+
+    toggleShowResultDialog(): void {
+        console.log(`Toggling Show Result Dialog to: ${this.showResultDialog}`);
+        try {
+            if (!this.config.store.mcp) {
+                this.config.store.mcp = {};
+            }
+            if (!this.config.store.mcp.pairProgrammingMode) {
+                this.config.store.mcp.pairProgrammingMode = {};
+            }
+            this.config.store.mcp.pairProgrammingMode.showResultDialog = this.showResultDialog;
+            this.config.save();
+            this.logger.info(`Show Result Dialog ${this.showResultDialog ? 'enabled' : 'disabled'}`);
+        } catch (error) {
+            console.error('Error toggling Show Result Dialog:', error);
         }
     }
 }

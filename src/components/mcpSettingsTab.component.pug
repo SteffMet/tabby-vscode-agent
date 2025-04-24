@@ -75,3 +75,57 @@
         i.fas.fa-save.mr-1
         span Save
     .text-muted Enable detailed logging for MCP operations
+
+  h3.mt-4 Pair Programming Mode
+
+  .form-group
+    label Enable Pair Programming Mode
+    .d-flex
+      toggle(
+        [(ngModel)]='pairProgrammingEnabled',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='togglePairProgrammingMode()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Enable collaborative features for pair programming with AI
+
+  .form-group(*ngIf='pairProgrammingEnabled')
+    label Auto Focus Terminal
+    .d-flex
+      toggle(
+        [(ngModel)]='autoFocusTerminal',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleAutoFocusTerminal()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Automatically focus the terminal window when executing commands
+
+  .form-group(*ngIf='pairProgrammingEnabled')
+    label Show Confirmation Dialog
+    .d-flex
+      toggle(
+        [(ngModel)]='showConfirmationDialog',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleShowConfirmationDialog()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Show a confirmation dialog before executing commands
+
+  .form-group(*ngIf='pairProgrammingEnabled')
+    label Show Result Dialog
+    .d-flex
+      toggle(
+        [(ngModel)]='showResultDialog',
+      )
+      button.btn.btn-secondary.ml-2(
+        (click)='toggleShowResultDialog()',
+      )
+        i.fas.fa-save.mr-1
+        span Save
+    .text-muted Show a dialog with command results after execution

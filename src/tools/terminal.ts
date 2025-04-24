@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { AppService, SplitTabComponent } from 'tabby-core';
+import { AppService, ConfigService, HostWindowService, SplitTabComponent } from 'tabby-core';
 import { BaseTerminalTabComponent, XTermFrontend } from 'tabby-terminal';
 import { BaseToolCategory } from './base-tool-category';
 import { SerializeAddon } from '@xterm/addon-serialize';
@@ -7,6 +7,7 @@ import { BehaviorSubject } from 'rxjs';
 import { ShellContext } from './shell-strategy';
 import { McpLoggerService } from '../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../services/commandOutputStorage.service';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import {
   SshSessionListTool,
   AbortCommandTool,
@@ -53,7 +54,13 @@ export class ExecToolCategory extends BaseToolCategory {
   // Shell context for managing different shell types
   public shellContext = new ShellContext();
 
-  constructor(private app: AppService, logger: McpLoggerService) {
+  constructor(
+    private app: AppService,
+    logger: McpLoggerService,
+    private config: ConfigService,
+    private hostWindow: HostWindowService,
+    private ngbModal: NgbModal
+  ) {
     super(logger);
 
     // Log discovered terminal sessions for debugging
@@ -75,7 +82,15 @@ export class ExecToolCategory extends BaseToolCategory {
     // Create tool instances
     const sshSessionListTool = new SshSessionListTool(this, this.logger);
     const abortCommandTool = new AbortCommandTool(this, this.logger);
-    const execCommandTool = new ExecCommandTool(this, this.logger, commandOutputStorage);
+    const execCommandTool = new ExecCommandTool(
+      this,
+      this.logger,
+      this.config,
+      this.hostWindow,
+      this.ngbModal,
+      this.app,
+      commandOutputStorage
+    );
     const getTerminalBufferTool = new GetTerminalBufferTool(this, this.logger);
     const getCommandOutputTool = new GetCommandOutputTool(this.logger, commandOutputStorage);
 

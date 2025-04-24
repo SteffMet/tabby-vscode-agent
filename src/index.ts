@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import TabbyCoreModule, { AppService, ConfigProvider, ConfigService, ToolbarButtonProvider } from 'tabby-core';
+import TabbyCoreModule, { AppService, ConfigProvider, ConfigService, ToolbarButtonProvider, HostWindowService } from 'tabby-core';
 import { McpService } from './services/mcpService';
 import { McpLoggerService } from './services/mcpLogger.service';
 import { ExecToolCategory } from './tools/terminal';
@@ -11,6 +11,8 @@ import { McpSettingsTabProvider } from './settings';
 import { McpSettingsTabComponent } from './components/mcpSettingsTab.component';
 import { SettingsTabProvider } from 'tabby-settings';
 import { McpConfigProvider } from './services/mcpConfigProvider';
+import { ConfirmCommandDialogComponent } from './components/confirmCommandDialog.component';
+import { CommandResultDialogComponent } from './components/commandResultDialog.component';
 
 /**
  * Module for the MCP server integration
@@ -21,6 +23,7 @@ import { McpConfigProvider } from './services/mcpConfigProvider';
     FormsModule,
     TabbyCoreModule
   ],
+  // Xóa styleUrls ở đây
   providers: [
     McpService,
     McpLoggerService,
@@ -31,11 +34,15 @@ import { McpConfigProvider } from './services/mcpConfigProvider';
   ],
   declarations: [
     ExecCommandButtonComponent,
-    McpSettingsTabComponent
+    McpSettingsTabComponent,
+    ConfirmCommandDialogComponent,
+    CommandResultDialogComponent
   ],
   entryComponents: [
     ExecCommandButtonComponent,
-    McpSettingsTabComponent
+    McpSettingsTabComponent,
+    ConfirmCommandDialogComponent,
+    CommandResultDialogComponent
   ],
   exports: [
     ExecCommandButtonComponent
@@ -50,10 +57,11 @@ export default class McpModule {
     private app: AppService,
     private config: ConfigService,
     private mcpService: McpService,
-    private logger: McpLoggerService
+    private logger: McpLoggerService,
+    private hostWindow: HostWindowService
   ) {
     console.log('[McpModule] Module initialized');
-        
+
         // Initialize the server properly after app and config are ready
         this.app.ready$.subscribe(() => {
             this.config.ready$.toPromise().then(() => {
@@ -61,23 +69,23 @@ export default class McpModule {
             });
         });
     }
-    
+
     /**
      * Initialize server on boot based on configuration
      */
     private async initServerOnBoot(): Promise<void> {
         try {
             this.logger.info('Checking if MCP server should start on boot');
-            
+
             // Ensure config is available (should be guaranteed by config.ready$)
             if (!this.config.store.mcp) {
                 this.logger.warn('MCP config not found, using default settings');
                 return;
             }
-            
+
             // Check if startOnBoot is enabled
             const startOnBoot = this.config.store.mcp.startOnBoot !== false; // Default to true
-            
+
             if (startOnBoot) {
                 this.logger.info('Starting MCP server (start on boot enabled)');
                 await this.mcpService.startServer(this.config.store.mcp.port);

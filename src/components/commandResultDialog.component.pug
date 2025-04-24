@@ -1,0 +1,41 @@
+.modal-header
+  h5 Command Execution Result
+  button.btn-close((click)='cancel()')
+
+.modal-body
+  .form-group
+    label Command
+    pre.form-control.command-preview {{command}}
+
+  .form-group
+    label Result
+    .alert.alert-success(*ngIf='exitCode === 0')
+      i.fas.fa-check-circle.mr-2
+      span Command completed successfully
+    .alert.alert-danger(*ngIf='exitCode !== 0 && exitCode !== null')
+      i.fas.fa-exclamation-circle.mr-2
+      span Command failed with exit code {{exitCode}}
+    .alert.alert-warning(*ngIf='aborted')
+      i.fas.fa-exclamation-triangle.mr-2
+      span Command execution was aborted
+
+  .form-group
+    label Output
+    pre.form-control.output-preview {{output}}
+
+  .form-group(*ngIf='originalInstruction')
+    label Original AI Instruction
+    pre.form-control.instruction-preview {{originalInstruction}}
+
+  .form-group
+    label Your Message/Instructions
+    textarea.form-control(
+      [(ngModel)]='userMessage',
+      rows='4',
+      placeholder='Enter your message or instructions here...'
+    )
+
+.modal-footer
+  button.btn.btn-secondary((click)='cancel()') Cancel
+  button.btn.btn-danger.mr-2((click)='reject()') Reject
+  button.btn.btn-primary((click)='accept()') Accept

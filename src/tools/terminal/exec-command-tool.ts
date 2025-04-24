@@ -6,6 +6,10 @@ import { ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
 import { escapeShellString } from '../../utils/escapeShellString';
+import { AppService, ConfigService, HostWindowService } from 'tabby-core';
+import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
+import { ConfirmCommandDialogComponent } from '../../components/confirmCommandDialog.component';
+import { CommandResultDialogComponent } from '../../components/commandResultDialog.component';
 
 /**
  * Tool for executing a command in a terminal
@@ -14,7 +18,16 @@ export class ExecCommandTool extends BaseTool {
   // Maximum number of lines to return in a single response
   private readonly MAX_LINES_PER_RESPONSE = 250;
   private outputStorage: CommandOutputStorageService;
-  constructor(private execToolCategory: ExecToolCategory, logger: McpLoggerService, outputStorage?: CommandOutputStorageService) {
+
+  constructor(
+    private execToolCategory: ExecToolCategory,
+    logger: McpLoggerService,
+    private config: ConfigService,
+    private hostWindow: HostWindowService,
+    private ngbModal: NgbModal,
+    private app: AppService,
+    outputStorage?: CommandOutputStorageService
+  ) {
     super(logger);
     // If outputStorage is not provided, create a new instance
     this.outputStorage = outputStorage || new CommandOutputStorageService(logger);
@@ -39,6 +52,11 @@ export class ExecCommandTool extends BaseTool {
             return createErrorResponse('A command is already running. Abort it first.');
           }
 
+          // Check if Pair Programming Mode is enabled
+          const pairProgrammingEnabled = this.config.store.mcp?.pairProgrammingMode?.enabled === true;
+          const showConfirmationDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showConfirmationDialog !== false;
+          const autoFocusTerminal = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.autoFocusTerminal !== false;
+
           // Find all terminal sessions
           const sessions = this.execToolCategory.findAndSerializeTerminalSessions();
 
@@ -62,6 +80,41 @@ export class ExecCommandTool extends BaseTool {
           }
 
           this.logger.info(`Using terminal session ${session.id} (${session.tab.title})`);
+
+          // Show confirmation dialog if enabled
+          if (showConfirmationDialog) {
+            try {
+              const modalRef = this.ngbModal.open(ConfirmCommandDialogComponent, { backdrop: 'static' });
+              modalRef.componentInstance.command = command;
+              modalRef.componentInstance.tabId = session.id;
+              modalRef.componentInstance.tabTitle = session.tab.title;
+
+              const result = await modalRef.result;
+              if (!result || !result.confirmed) {
+                this.logger.info('Command execution cancelled by user');
+                return createJsonResponse({
+                  output: 'Command execution cancelled by user',
+                  aborted: true,
+                  exitCode: null
+                });
+              }
+            } catch (error) {
+              this.logger.error('Error showing confirmation dialog:', error);
+              // Continue with execution if dialog fails
+            }
+          }
+
+          // Focus terminal if enabled
+          if (autoFocusTerminal) {
+            try {
+              this.hostWindow.bringToFront();
+              this.app.selectTab(session.tab);
+              session.tab.focus();
+            } catch (error) {
+              this.logger.error('Error focusing terminal:', error);
+              // Continue with execution if focus fails
+            }
+          }
 
           // Generate unique markers for this command
           const timestamp = Date.now();
@@ -91,20 +144,20 @@ export class ExecCommandTool extends BaseTool {
 
           // First determine which shell we're running in using read to hide commands
           const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
-          
+
           session.tab.sendInput('\x03');
           // First send a read command that will hide the detection script - more shell compatible approach
           session.tab.sendInput(`\nstty -echo; read detect_shell; stty echo; eval "$detect_shell"\n`);
-          
+
           // Send the detection script as input to the read command (will be hidden)
           session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
-          
+
           // Wait a moment for the shell type to be detected
           await new Promise(resolve => setTimeout(resolve, 100));
-          
+
           // Get terminal buffer to check shell type
           const textBeforeSetup = this.execToolCategory.getTerminalBufferText(session);
-          
+
           // Determine shell type from output
           const shellType = this.execToolCategory.shellContext.detectShellType(textBeforeSetup);
           this.logger.info(`Detected shell type: ${shellType}`);
@@ -122,10 +175,10 @@ export class ExecCommandTool extends BaseTool {
 
           // Send the actual setup script (will be hidden by read)
           session.tab.sendInput(`${escapeShellString(setupScript)}\n`);
-          
+
           // Wait for setup to complete
           await new Promise(resolve => setTimeout(resolve, 100));
-          
+
           let tmpMarker = `_T${timestamp}`;
           // Execute the command with markers
           session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command} #${tmpMarker}`);
@@ -245,10 +298,62 @@ export class ExecCommandTool extends BaseTool {
               aborted: true,
               tabId: session.id
             });
-          
+
             const outputLines = output.split('\n');
             if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
               output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
+            }
+
+            // Show result dialog if enabled
+            const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
+            if (showResultDialog) {
+              try {
+                const modalRef = this.ngbModal.open(CommandResultDialogComponent, {
+                  backdrop: 'static',
+                  size: 'lg'
+                });
+                modalRef.componentInstance.command = command;
+                modalRef.componentInstance.output = output;
+                modalRef.componentInstance.exitCode = exitCode;
+                modalRef.componentInstance.aborted = true;
+
+                // Wait for user to close the dialog or provide feedback
+                const result = await modalRef.result;
+                if (result) {
+                  if (result.accepted && result.userMessage) {
+                    // User accepted with a message
+                    return createJsonResponse({
+                      output: output,
+                      promptShell,
+                      exitCode,
+                      aborted: true,
+                      outputId,
+                      message: result.userMessage,
+                      userFeedback: {
+                        accepted: true,
+                        message: result.userMessage
+                      }
+                    });
+                  } else if (result.accepted === false && result.rejectionMessage) {
+                    // User rejected with a message
+                    return createJsonResponse({
+                      output: output,
+                      promptShell,
+                      exitCode,
+                      aborted: true,
+                      outputId,
+                      message: `Command rejected: ${result.rejectionMessage}`,
+                      userFeedback: {
+                        accepted: false,
+                        message: result.rejectionMessage
+                      }
+                    });
+                  }
+                }
+              } catch (error) {
+                this.logger.error('Error showing result dialog:', error);
+                // Continue with normal response if dialog fails
+              }
             }
 
             return createJsonResponse({
@@ -281,11 +386,63 @@ export class ExecCommandTool extends BaseTool {
             output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
           }
 
+          // Show result dialog if enabled
+          const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
+          if (showResultDialog) {
+            try {
+              const modalRef = this.ngbModal.open(CommandResultDialogComponent, {
+                backdrop: 'static',
+                size: 'lg'
+              });
+              modalRef.componentInstance.command = command;
+              modalRef.componentInstance.output = output;
+              modalRef.componentInstance.exitCode = exitCode;
+              modalRef.componentInstance.aborted = false;
+
+              // Wait for user to close the dialog or provide feedback
+              const result = await modalRef.result;
+              if (result) {
+                if (result.accepted && result.userMessage) {
+                  // User accepted with a message
+                  return createJsonResponse({
+                    output: output,
+                    promptShell,
+                    exitCode,
+                    aborted: false,
+                    outputId,
+                    message: result.userMessage,
+                    userFeedback: {
+                      accepted: true,
+                      message: result.userMessage
+                    }
+                  });
+                } else if (result.accepted === false && result.rejectionMessage) {
+                  // User rejected with a message
+                  return createJsonResponse({
+                    output: output,
+                    promptShell,
+                    exitCode,
+                    aborted: false,
+                    outputId,
+                    message: `Command rejected: ${result.rejectionMessage}`,
+                    userFeedback: {
+                      accepted: false,
+                      message: result.rejectionMessage
+                    }
+                  });
+                }
+              }
+            } catch (error) {
+              this.logger.error('Error showing result dialog:', error);
+              // Continue with normal response if dialog fails
+            }
+          }
+
           return createJsonResponse({
             output: output,
             promptShell,
             exitCode,
-            aborted: true,
+            aborted: false,
             outputId,
             message: outputLines.length > this.MAX_LINES_PER_RESPONSE
             ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`

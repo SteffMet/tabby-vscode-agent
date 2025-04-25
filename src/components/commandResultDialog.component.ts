@@ -8,7 +8,7 @@ import { HotkeysService } from 'tabby-core';
  * Dialog component for displaying command execution results
  */
 @Component({
-  templateUrl: './commandResultDialog.component.pug',
+  templateUrl: './commandResultDialog.component.pug'
 })
 export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
   @Input() command: string;
@@ -62,7 +62,19 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
       if (this.modal) {
         const modalElement = document.querySelector('.modal-content') as HTMLElement;
         if (modalElement) {
+          // Add tabindex to make the modal focusable
+          if (!modalElement.hasAttribute('tabindex')) {
+            modalElement.setAttribute('tabindex', '-1');
+          }
+
+          // Add focused class for visual indication
+          modalElement.classList.add('focused');
+
+          // Focus the modal
           modalElement.focus();
+
+          // Add event listener to prevent focus from leaving the modal
+          document.addEventListener('focusin', this.keepFocusInModal);
         }
       }
 
@@ -75,6 +87,17 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
       // Pause hotkeys while dialog is open
       this.pauseHotkeys();
     }, 100);
+  }
+
+  /**
+   * Event handler to keep focus inside the modal
+   */
+  private keepFocusInModal = (event: FocusEvent) => {
+    const modalElement = document.querySelector('.modal-content') as HTMLElement;
+    if (modalElement && !modalElement.contains(event.target as Node)) {
+      // If focus is outside the modal, bring it back
+      modalElement.focus();
+    }
   }
 
   /**
@@ -266,6 +289,15 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
    */
   ngOnDestroy(): void {
     this.resumeHotkeys();
+
+    // Remove the focus event listener
+    document.removeEventListener('focusin', this.keepFocusInModal);
+
+    // Remove focused class from modal if it exists
+    const modalElement = document.querySelector('.modal-content') as HTMLElement;
+    if (modalElement) {
+      modalElement.classList.remove('focused');
+    }
   }
 }
 

@@ -17,6 +17,9 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { DialogService } from './services/dialog.service';
 import { DialogManagerService } from './services/dialogManager.service';
 
+// Import global styles
+import './styles.scss';
+
 /**
  * Module for the MCP server integration
  */

@@ -33,6 +33,39 @@ export class DialogManagerService {
   /** Observable that fires when a dialog is closed */
   get dialogClosed$(): Observable<any> { return this.dialogClosed; }
 
+  /**
+   * Event handler to trap tab key within the modal
+   * This prevents users from tabbing outside the modal
+   */
+  private trapTabKey = (event: KeyboardEvent): void => {
+    // Only handle Tab key
+    if (event.key !== 'Tab') return;
+
+    // Find all focusable elements in the modal
+    const modalElement = document.querySelector('.modal-content') as HTMLElement;
+    if (!modalElement) return;
+
+    const focusableElements = modalElement.querySelectorAll(
+      'a[href], button, textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    );
+
+    if (focusableElements.length === 0) return;
+
+    const firstElement = focusableElements[0] as HTMLElement;
+    const lastElement = focusableElements[focusableElements.length - 1] as HTMLElement;
+
+    // If shift+tab on first element, move to last element
+    if (event.shiftKey && document.activeElement === firstElement) {
+      event.preventDefault();
+      lastElement.focus();
+    }
+    // If tab on last element, move to first element
+    else if (!event.shiftKey && document.activeElement === lastElement) {
+      event.preventDefault();
+      firstElement.focus();
+    }
+  }
+
   constructor(
     private ngbModal: NgbModal,
     log: LogService
@@ -108,7 +141,15 @@ export class DialogManagerService {
    */
   private showDialog(request: DialogRequest): void {
     try {
-      this.activeDialog = this.ngbModal.open(request.component, request.options);
+      // Ensure modal options always include focus trapping settings
+      const modalOptions = {
+        backdrop: 'static', // Prevents closing when clicking outside
+        keyboard: false,    // Prevents closing with Escape key
+        windowClass: 'force-focus-modal', // Add a class for additional styling
+        ...request.options  // Allow overriding with custom options if needed
+      };
+
+      this.activeDialog = this.ngbModal.open(request.component, modalOptions);
 
       // Set properties on the component instance
       for (const key in request.props) {
@@ -116,6 +157,9 @@ export class DialogManagerService {
           this.activeDialog.componentInstance[key] = request.props[key];
         }
       }
+
+      // Add event listener to prevent tab navigation outside the modal
+      document.addEventListener('keydown', this.trapTabKey);
 
       // Emit dialog opened event
       this.dialogOpened.next({
@@ -152,6 +196,9 @@ export class DialogManagerService {
       result,
       error
     });
+
+    // Remove the tab trap event listener
+    document.removeEventListener('keydown', this.trapTabKey);
 
     this.activeDialog = null;
 

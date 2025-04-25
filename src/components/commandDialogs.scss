@@ -18,6 +18,19 @@
   word-break: break-all;
   max-height: 300px;
   overflow-y: auto;
+  resize: vertical;
+
+  // Styling for readonly textarea to look more like a text display
+  &[readonly] {
+    cursor: text;
+
+    // Remove focus outline for readonly textarea
+    &:focus {
+      outline: none;
+      box-shadow: none;
+      border-color: inherit;
+    }
+  }
 }
 
 .instruction-preview {

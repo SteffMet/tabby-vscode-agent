@@ -115,6 +115,24 @@ export class ConfirmCommandDialogComponent implements AfterViewInit, OnDestroy {
   }
 
   /**
+   * Handle keydown events in the textarea
+   * @param event Keyboard event
+   */
+  onTextareaKeyDown(event: KeyboardEvent): void {
+    // Handle Shift+Enter to add a new line
+    if (event.key === 'Enter' && event.shiftKey) {
+      // Let the default behavior happen (add a new line)
+      return;
+    }
+
+    // Handle Enter to submit the form
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.reject();
+    }
+  }
+
+  /**
    * Confirm command execution
    */
   confirm(): void {

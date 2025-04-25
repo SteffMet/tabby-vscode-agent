@@ -21,7 +21,8 @@
       #rejectMessageTextarea
       [(ngModel)]='rejectMessage',
       rows='3',
-      placeholder='Enter your reason for rejecting this command...'
+      placeholder='Enter your reason for rejecting this command...',
+      (keydown)='onTextareaKeyDown($event)'
     )
 
 .modal-footer

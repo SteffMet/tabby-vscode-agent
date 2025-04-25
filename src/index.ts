@@ -15,6 +15,7 @@ import { ConfirmCommandDialogModule } from './components/confirmCommandDialog.co
 import { CommandResultDialogModule } from './components/commandResultDialog.component';
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { DialogService } from './services/dialog.service';
+import { DialogManagerService } from './services/dialogManager.service';
 
 /**
  * Module for the MCP server integration
@@ -34,6 +35,7 @@ import { DialogService } from './services/dialog.service';
     McpLoggerService,
     ExecToolCategory,
     DialogService,
+    DialogManagerService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
@@ -104,3 +106,5 @@ export * from './services/mcpService';
 export * from './services/mcpLogger.service';
 export * from './type/types';
 export * from './services/mcpConfigProvider';
+export * from './services/dialog.service';
+export * from './services/dialogManager.service';

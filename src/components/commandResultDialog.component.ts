@@ -12,7 +12,20 @@ import { HotkeysService } from 'tabby-core';
 })
 export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
   @Input() command: string;
-  @Input() output: string;
+
+  private _output: string = '';
+  @Input()
+  set output(value: string) {
+    this._output = value;
+    // If the component is already initialized, adjust the textarea height
+    if (this.outputTextareaRef?.nativeElement) {
+      setTimeout(() => this.adjustTextareaHeight(this.outputTextareaRef.nativeElement), 0);
+    }
+  }
+  get output(): string {
+    return this._output;
+  }
+
   @Input() exitCode: number | null;
   @Input() aborted: boolean;
   @Input() originalInstruction: string = '';
@@ -28,6 +41,9 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
 
   // Reference to the message textarea
   @ViewChild('messageTextarea') messageTextareaRef: ElementRef<HTMLTextAreaElement>;
+
+  // Reference to the output textarea
+  @ViewChild('outputTextarea') outputTextareaRef: ElementRef<HTMLTextAreaElement>;
 
   // Track if hotkeys are paused
   private hotkeysPaused = false;
@@ -49,9 +65,33 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
           modalElement.focus();
         }
       }
+
+      // Set the output textarea to the correct height based on content
+      if (this.outputTextareaRef?.nativeElement) {
+        // Adjust the height to fit the content
+        this.adjustTextareaHeight(this.outputTextareaRef.nativeElement);
+      }
+
       // Pause hotkeys while dialog is open
       this.pauseHotkeys();
     }, 100);
+  }
+
+  /**
+   * Adjust textarea height to fit content
+   * @param textarea Textarea element to adjust
+   */
+  private adjustTextareaHeight(textarea: HTMLTextAreaElement): void {
+    // Reset height to calculate the proper scrollHeight
+    textarea.style.height = 'auto';
+
+    // Set the height to match the scrollHeight (content height)
+    const scrollHeight = textarea.scrollHeight;
+    if (scrollHeight > 0) {
+      // Limit max height to 300px (same as CSS max-height)
+      const maxHeight = 300;
+      textarea.style.height = Math.min(scrollHeight, maxHeight) + 'px';
+    }
   }
 
   /**
@@ -124,9 +164,28 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
     this.accept();
   }
 
-  // Removed duplicate handler
+  /**
+   * Handle keydown events in the textarea
+   * @param event Keyboard event
+   */
+  onTextareaKeyDown(event: KeyboardEvent): void {
+    // Handle Shift+Enter to add a new line
+    if (event.key === 'Enter' && event.shiftKey) {
+      // Let the default behavior happen (add a new line)
+      return;
+    }
 
-  // Removed duplicate handler
+    // Handle Enter to submit the form
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+
+      if (this.isRejectMode) {
+        this.reject();
+      } else {
+        this.accept();
+      }
+    }
+  }
 
   /**
    * Accept the command result with user message

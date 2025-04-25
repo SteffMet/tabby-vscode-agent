@@ -21,7 +21,12 @@
 
   .form-group
     label Output
-    pre.form-control.output-preview {{output}}
+    textarea.form-control.output-preview(
+      #outputTextarea
+      readonly,
+      rows='10',
+      [ngModel]='output'
+    )
 
   .form-group(*ngIf='originalInstruction')
     label Original AI Instruction
@@ -35,7 +40,8 @@
       [(ngModel)]='userMessage',
       rows='4',
       placeholder='{{isRejectMode ? "Enter your reason for rejecting this command..." : "Enter your message or instructions here..."}}',
-      class='{{isRejectMode ? "border-danger" : ""}}'
+      class='{{isRejectMode ? "border-danger" : ""}}',
+      (keydown)='onTextareaKeyDown($event)'
     )
 
 .modal-footer

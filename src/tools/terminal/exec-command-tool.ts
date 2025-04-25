@@ -121,6 +121,39 @@ export class ExecCommandTool extends BaseTool {
             try {
               // First, select the tab to make it active
               this.app.selectTab(session.tabParent);
+
+              // Wait for the tab to be selected and focused
+              await new Promise(resolve => setTimeout(resolve, 300));
+
+              // Try to focus the tab directly
+              if (session.tab && typeof session.tab.focus === 'function') {
+                session.tab.focus();
+              }
+
+              // Wait a bit more to ensure focus is complete
+              await new Promise(resolve => setTimeout(resolve, 200));
+              
+              // Check if the tab is focused
+              const isFocused = session.tab.hasFocus;
+              if (!isFocused) {
+                this.logger.warn('Terminal tab may not be properly focused, trying again');
+
+                // Try one more time with a longer delay
+                await new Promise(resolve => setTimeout(resolve, 500));
+
+                if (session.tab && typeof session.tab.focus === 'function') {
+                  session.tab.focus();
+                }
+
+                // Final check
+                if (!session.tab.hasFocus) {
+                  this.logger.warn('Terminal tab still not focused after retry');
+                } else {
+                  this.logger.info('Terminal tab focused successfully after retry');
+                }
+              } else {
+                this.logger.info('Terminal tab focused successfully');
+              }
             } catch (error) {
               this.logger.error('Error focusing terminal:', error);
               // Continue with execution if focus fails

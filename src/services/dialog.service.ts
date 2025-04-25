@@ -1,14 +1,15 @@
 import { Injectable } from '@angular/core';
-import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { CommandResultDialogComponent } from '../components/commandResultDialog.component';
 import { ConfirmCommandDialogComponent } from '../components/confirmCommandDialog.component';
+import { DialogManagerService } from './dialogManager.service';
 
 /**
  * Service to manage dialogs in the application
+ * Uses DialogManagerService to ensure only one dialog is displayed at a time
  */
 @Injectable({ providedIn: 'root' })
 export class DialogService {
-    constructor(private ngbModal: NgbModal) {}
+    constructor(private dialogManager: DialogManagerService) {}
 
     /**
      * Show command confirmation dialog
@@ -18,12 +19,15 @@ export class DialogService {
      * @returns Promise with dialog result
      */
     async showConfirmCommandDialog(command: string, tabId: number, tabTitle: string): Promise<any> {
-        const modalRef = this.ngbModal.open(ConfirmCommandDialogComponent, { backdrop: 'static' });
-        modalRef.componentInstance.command = command;
-        modalRef.componentInstance.tabId = tabId;
-        modalRef.componentInstance.tabTitle = tabTitle;
-        
-        return modalRef.result;
+        return this.dialogManager.openDialog(
+            ConfirmCommandDialogComponent,
+            { backdrop: 'static' },
+            {
+                command,
+                tabId,
+                tabTitle
+            }
+        );
     }
 
     /**
@@ -36,23 +40,25 @@ export class DialogService {
      * @returns Promise with dialog result
      */
     async showCommandResultDialog(
-        command: string, 
-        output: string, 
-        exitCode: number | null, 
+        command: string,
+        output: string,
+        exitCode: number | null,
         aborted: boolean,
         originalInstruction: string = ''
     ): Promise<any> {
-        const modalRef = this.ngbModal.open(CommandResultDialogComponent, { 
-            backdrop: 'static',
-            size: 'lg'
-        });
-        
-        modalRef.componentInstance.command = command;
-        modalRef.componentInstance.output = output;
-        modalRef.componentInstance.exitCode = exitCode;
-        modalRef.componentInstance.aborted = aborted;
-        modalRef.componentInstance.originalInstruction = originalInstruction;
-        
-        return modalRef.result;
+        return this.dialogManager.openDialog(
+            CommandResultDialogComponent,
+            {
+                backdrop: 'static',
+                size: 'lg'
+            },
+            {
+                command,
+                output,
+                exitCode,
+                aborted,
+                originalInstruction
+            }
+        );
     }
 }

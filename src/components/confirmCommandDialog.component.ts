@@ -14,6 +14,7 @@ export class ConfirmCommandDialogComponent implements AfterViewInit, OnDestroy {
   @Input() command: string;
   @Input() tabId: number;
   @Input() tabTitle: string;
+  @Input() commandExplanation: string;
 
   // Flag to show/hide reject input form
   showRejectInput = false;

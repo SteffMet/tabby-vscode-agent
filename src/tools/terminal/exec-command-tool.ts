@@ -36,13 +36,17 @@ export class ExecCommandTool extends BaseTool {
       description: 'Execute a command in a terminal session and return the output. For long outputs, the command ID is returned which can be used with get_command_output tool to retrieve the full output with pagination.',
       schema: {
         command: z.string().describe('Command to execute in the terminal'),
+        commandExplanation: z.string().optional().describe('Explain the command in detail: 1) What the base command does (e.g. "ls" lists directory contents), 2) What each argument/flag does (e.g. "-r" reverses order, "-t" sorts by time, etc), 3) The overall purpose of the complete command'),
         tabId: z.string().optional().describe('Tab ID to execute in, get from get_ssh_session_list')
       },
       handler: async (params, extra) => {
         try {
           console.log('Params:', JSON.stringify(params));
-          const { command, tabId } = params;
+          const { command, tabId, commandExplanation } = params;
           console.log(`Executing command: ${command}, tabId: ${tabId}`);
+          if (commandExplanation) {
+            console.log(`Command explanation: ${commandExplanation}`);
+          }
 
           // Check if a command is already running
           if (this.execToolCategory.activeCommand) {
@@ -84,7 +88,8 @@ export class ExecCommandTool extends BaseTool {
               const result = await this.dialogService.showConfirmCommandDialog(
                 command,
                 session.id,
-                session.tab.title
+                session.tab.title,
+                commandExplanation
               );
 
               if (!result || !result.confirmed) {
@@ -132,7 +137,7 @@ export class ExecCommandTool extends BaseTool {
 
               // Wait a bit more to ensure focus is complete
               await new Promise(resolve => setTimeout(resolve, 200));
-              
+
               // Check if the tab is focused
               const isFocused = session.tab.hasFocus;
               if (!isFocused) {
@@ -223,18 +228,10 @@ export class ExecCommandTool extends BaseTool {
           // Wait for setup to complete
           await new Promise(resolve => setTimeout(resolve, 100));
 
-          let tmpMarker = `_T${timestamp}`;
-          // Execute the command with markers
-          session.tab.sendInput(`\n${commandPrefix}echo "${startMarker}" && ${command} #${tmpMarker}`);
+          session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && ${command}`);
 
-          let timeout = 10000; // 10 seconds
-          while (timeout > 0 && !aborted) {
-            await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
-            if (this.execToolCategory.getTerminalBufferText(session).includes(tmpMarker)) {
-              break;
-            }
-            timeout -= 100;
-          }
+          await new Promise(resolve => setTimeout(resolve, 500));
+
           session.tab.sendInput(`\n`);
 
 

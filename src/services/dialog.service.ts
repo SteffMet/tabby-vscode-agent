@@ -16,16 +16,23 @@ export class DialogService {
      * @param command Command to execute
      * @param tabId Tab ID
      * @param tabTitle Tab title
+     * @param commandExplanation Optional explanation of what the command does
      * @returns Promise with dialog result
      */
-    async showConfirmCommandDialog(command: string, tabId: number, tabTitle: string): Promise<any> {
+    async showConfirmCommandDialog(
+        command: string,
+        tabId: number,
+        tabTitle: string,
+        commandExplanation?: string
+    ): Promise<any> {
         return this.dialogManager.openDialog(
             ConfirmCommandDialogComponent,
             { backdrop: 'static' },
             {
                 command,
                 tabId,
-                tabTitle
+                tabTitle,
+                commandExplanation
             }
         );
     }

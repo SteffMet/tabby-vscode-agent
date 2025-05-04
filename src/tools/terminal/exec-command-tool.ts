@@ -10,7 +10,10 @@ import { AppService, ConfigService } from 'tabby-core';
 import { DialogService } from '../../services/dialog.service';
 
 /**
- * Tool for executing a command in a terminal
+ * Tool for executing a command in a terminal session and retrieving the output.
+ *
+ * This tool allows executing shell commands in terminal sessions and handles
+ * command execution, output capture, and result formatting.
  */
 export class ExecCommandTool extends BaseTool {
   // Maximum number of lines to return in a single response
@@ -33,11 +36,49 @@ export class ExecCommandTool extends BaseTool {
   getTool() {
     return {
       name: 'exec_command',
-      description: 'Execute a command in a terminal session and return the output. For long outputs, the command ID is returned which can be used with get_command_output tool to retrieve the full output with pagination.',
+      description: `Executes a shell command in a terminal session and returns the command output, exit code, and shell prompt.
+
+USE CASES:
+- Run shell commands to interact with the system
+- Execute scripts or programs
+- Query system status or configuration
+- Perform file operations
+
+LIMITATIONS:
+- Only one command can run at a time
+- Commands with very long output (>250 lines) will be truncated
+- Some interactive commands may not work as expected
+
+RETURNS:
+{
+  "output": "Command output text (truncated to 250 lines if longer)",
+  "promptShell": "The shell prompt (e.g., user@host:~$)",
+  "exitCode": 0, // Command exit code (0 typically means success)
+  "aborted": false, // Whether the command was aborted
+  "outputId": "unique-id", // ID to use with get_command_output for pagination
+  "message": "" // Optional message about truncation or user feedback
+}
+
+RELATED TOOLS:
+- get_ssh_session_list: Find available terminal sessions
+- abort_command: Stop a running command
+- get_command_output: Retrieve full output for truncated responses
+
+EXAMPLE USAGE:
+1. List available terminals: get_ssh_session_list()
+2. Execute command: exec_command({ command: "ls -la", tabId: "0" })
+3. If output is truncated, get full output: get_command_output({ outputId: "abc123" })
+
+POSSIBLE ERRORS:
+- "A command is already running. Abort it first." - Use abort_command to stop the current command.
+- "No terminal sessions available" - Open a terminal tab first.
+- "No terminal session found with ID {tabId}" - Use get_ssh_session_list to find valid IDs.`,
       schema: {
-        command: z.string().describe('Command to execute in the terminal'),
-        commandExplanation: z.string().optional().describe('Explain the command in detail: 1) What the base command does (e.g. "ls" lists directory contents), 2) What each argument/flag does (e.g. "-r" reverses order, "-t" sorts by time, etc), 3) The overall purpose of the complete command'),
-        tabId: z.string().optional().describe('Tab ID to execute in, get from get_ssh_session_list')
+        command: z.string().describe('The shell command to execute. Can be any valid shell command, script, or program that would normally run in a terminal. Examples: "ls -la", "cat /etc/hosts", "ps aux | grep node"'),
+
+        commandExplanation: z.string().optional().describe('Explanation of what the command does, used for user confirmation in pair programming mode. Include: 1) What the base command does (e.g., "ls" lists directory contents), 2) What each argument/flag does (e.g., "-r" reverses order), 3) The overall purpose of the command. Example: "The command \'ls -la\' lists all files including hidden ones in long format showing permissions and sizes."'),
+
+        tabId: z.string().optional().describe('The ID of the terminal tab where the command will be executed. If not provided, the currently focused terminal will be used. Get available IDs by calling get_ssh_session_list first. Example: "0" or "1".')
       },
       handler: async (params, extra) => {
         try {
@@ -195,8 +236,10 @@ export class ExecCommandTool extends BaseTool {
           const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
 
           session.tab.sendInput('\x03');
+          await new Promise(resolve => setTimeout(resolve, 100));
+
           // First send a read command that will hide the detection script - more shell compatible approach
-          session.tab.sendInput(`\nstty -echo; read detect_shell; stty echo; eval "$detect_shell"\n`);
+          session.tab.sendInput(`stty -echo; read detect_shell; stty echo; eval "$detect_shell"\n`);
 
           // Send the detection script as input to the read command (will be hidden)
           session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
@@ -228,11 +271,26 @@ export class ExecCommandTool extends BaseTool {
           // Wait for setup to complete
           await new Promise(resolve => setTimeout(resolve, 100));
 
-          session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && ${command}`);
+          // Check if command contains newlines (multiple commands)
+          if (command.includes('\n')) {
+            // For multi-line commands, use a different approach with curly braces
+            session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && {\n`);
 
-          await new Promise(resolve => setTimeout(resolve, 500));
+            // Send the command content, trimming any trailing newline
+            const trimmedCommand = command.endsWith('\n') ? command.slice(0, -1) : command;
+            session.tab.sendInput(trimmedCommand);
+            await new Promise(resolve => setTimeout(resolve, 500));
+            // Close the command block and execute
+            session.tab.sendInput(`\n}\n`);
 
-          session.tab.sendInput(`\n`);
+          } else {
+            // For single-line commands, use the original approach
+            session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && ${command}`);
+
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            session.tab.sendInput(`\n`);
+          }
 
 
           // Wait for command output

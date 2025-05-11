@@ -19,6 +19,8 @@ export class ExecCommandTool extends BaseTool {
   // Maximum number of lines to return in a single response
   private readonly MAX_LINES_PER_RESPONSE = 250;
   private outputStorage: CommandOutputStorageService;
+  // Default typing delay in milliseconds
+  private readonly DEFAULT_TYPING_DELAY = 1;
 
   constructor(
     private execToolCategory: ExecToolCategory,
@@ -31,6 +33,20 @@ export class ExecCommandTool extends BaseTool {
     super(logger);
     // If outputStorage is not provided, create a new instance
     this.outputStorage = outputStorage || new CommandOutputStorageService(logger);
+  }
+
+  /**
+   * Simulates typing by sending input character by character with a delay
+   * @param session The terminal session
+   * @param text The text to type
+   * @param delayMs The delay between characters in milliseconds
+   * @returns Promise that resolves when typing is complete
+   */
+  private async simulateTyping(session: BaseTerminalTabComponentWithId, text: string, delayMs: number = this.DEFAULT_TYPING_DELAY): Promise<void> {
+    for (let i = 0; i < text.length; i++) {
+      session.tab.sendInput(text[i]);
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
   }
 
   getTool() {
@@ -237,16 +253,24 @@ POSSIBLE ERRORS:
 
           session.tab.sendInput('\x03');
           await new Promise(resolve => setTimeout(resolve, 100));
-
+          const trimmedCommand = command.endsWith('\n') ? command.slice(0, -1) : command;
           // First send a read command that will hide the detection script - more shell compatible approach
-          session.tab.sendInput(`stty -echo; read detect_shell; stty echo; eval "$detect_shell"\n`);
-
+          // Check if command contains newlines (multiple commands)
+          if (command.includes('\n')) {
+            // Send the command with typing simulation
+            await this.simulateTyping(session, `stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1; {
+echo "${startMarker}"
+${trimmedCommand}
+}\n`);
+          } else {
+            // For single-line commands, use the simpler approach with proper semicolons
+              await this.simulateTyping(session, `stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1;echo "${startMarker}";\\
+${trimmedCommand}\n`);
+          }
           // Send the detection script as input to the read command (will be hidden)
           session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
 
-          // Wait a moment for the shell type to be detected
           await new Promise(resolve => setTimeout(resolve, 100));
-
           // Get terminal buffer to check shell type
           const textBeforeSetup = this.execToolCategory.getTerminalBufferText(session);
 
@@ -261,37 +285,8 @@ POSSIBLE ERRORS:
           const setupScript = shellStrategy.getSetupScript(startMarker, endMarker);
           const commandPrefix = shellStrategy.getCommandPrefix();
 
-          // Send the setup script using read to hide it - more shell compatible approach
-          session.tab.sendInput(`stty -echo; read setup_script; stty echo; eval "$setup_script"\n`);
-          await new Promise(resolve => setTimeout(resolve, 100));
-
           // Send the actual setup script (will be hidden by read)
           session.tab.sendInput(`${escapeShellString(setupScript)}\n`);
-
-          // Wait for setup to complete
-          await new Promise(resolve => setTimeout(resolve, 100));
-
-          // Check if command contains newlines (multiple commands)
-          if (command.includes('\n')) {
-            // For multi-line commands, use a different approach with curly braces
-            session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && {\n`);
-
-            // Send the command content, trimming any trailing newline
-            const trimmedCommand = command.endsWith('\n') ? command.slice(0, -1) : command;
-            session.tab.sendInput(trimmedCommand);
-            await new Promise(resolve => setTimeout(resolve, 500));
-            // Close the command block and execute
-            session.tab.sendInput(`\n}\n`);
-
-          } else {
-            // For single-line commands, use the original approach
-            session.tab.sendInput(`${commandPrefix}echo "${startMarker}" && ${command}`);
-
-            await new Promise(resolve => setTimeout(resolve, 500));
-
-            session.tab.sendInput(`\n`);
-          }
-
 
           // Wait for command output
           let output = '';

@@ -6,6 +6,7 @@ import { McpService } from './services/mcpService';
 import { McpLoggerService } from './services/mcpLogger.service';
 import { ExecToolCategory } from './tools/terminal';
 import { ExecCommandButtonComponent } from './components/execCommandButton.component';
+import { MinimizedDialogsModalComponent } from './components/minimizedModal.component';
 import { McpToolbarButtonProvider } from './toolbarButtonProvider';
 import { McpSettingsTabProvider } from './settings';
 import { McpSettingsTabComponent } from './components/mcpSettingsTab.component';
@@ -16,6 +17,7 @@ import { CommandResultDialogModule } from './components/commandResultDialog.comp
 import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { DialogService } from './services/dialog.service';
 import { DialogManagerService } from './services/dialogManager.service';
+import { MinimizedDialogManagerService } from './services/minimizedDialogManager.service';
 
 // Import global styles
 import './styles.scss';
@@ -39,16 +41,19 @@ import './styles.scss';
     ExecToolCategory,
     DialogService,
     DialogManagerService,
+    MinimizedDialogManagerService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
   ],
   declarations: [
     ExecCommandButtonComponent,
+    MinimizedDialogsModalComponent,
     McpSettingsTabComponent
   ],
   entryComponents: [
     ExecCommandButtonComponent,
+    MinimizedDialogsModalComponent,
     McpSettingsTabComponent
   ],
   exports: [

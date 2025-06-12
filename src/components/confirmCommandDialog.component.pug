@@ -1,6 +1,9 @@
 .modal-header
   h5 Confirm Command Execution
-  button.btn-close((click)='cancel()')
+  .header-actions
+    button.btn.btn-sm.btn-outline-secondary.me-2((click)='minimize()', title='Minimize dialog')
+      i.fas.fa-window-minimize
+    button.btn-close((click)='cancel()')
 
 .modal-body
   .alert.alert-info
@@ -32,9 +35,9 @@
     )
 
 .modal-footer
-  button.btn.btn-secondary((click)='cancel()')
-    span Cancel
-    small.text-muted (Esc)
+  button.btn.btn-secondary((click)='minimize()')
+    span Minimize
+    small.text-muted (Click outside to close)
 
   button.btn.btn-danger.mr-2(*ngIf='!showRejectInput', (click)='showRejectForm()')
     span Reject

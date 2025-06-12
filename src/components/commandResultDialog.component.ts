@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { CommonModule } from '@angular/common';
 import { HotkeysService } from 'tabby-core';
+import { MinimizedDialogManagerService } from '../services/minimizedDialogManager.service';
 
 /**
  * Dialog component for displaying command execution results
@@ -48,10 +49,16 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
   // Track if hotkeys are paused
   private hotkeysPaused = false;
 
+  // Dialog ID for minimize/restore functionality
+  public dialogId: string = '';
+
   constructor(
     public modal: NgbActiveModal,
-    private hotkeysService: HotkeysService
-  ) { }
+    private hotkeysService: HotkeysService,
+    private minimizedDialogManager: MinimizedDialogManagerService
+  ) {
+    this.dialogId = this.minimizedDialogManager.generateDialogId();
+  }
 
   /**
    * After view init, focus the textarea and pause hotkeys
@@ -282,6 +289,30 @@ export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
   cancel(): void {
     this.resumeHotkeys();
     this.modal.close();
+  }
+
+  /**
+   * Minimize the dialog
+   */
+  minimize(): void {
+    console.log('Minimizing command result dialog');
+    
+    // Create minimized dialog object
+    const minimizedDialog = {
+      id: this.dialogId,
+      title: `Result: ${this.command.length > 40 ? this.command.substring(0, 40) + '...' : this.command}`,
+      component: CommandResultDialogComponent,
+      instance: this,
+      modalRef: this.modal,
+      timestamp: Date.now()
+    };
+    
+    // Add to minimized dialogs
+    this.minimizedDialogManager.minimizeDialog(minimizedDialog);
+    
+    // Dismiss the modal with 'minimized' reason
+    this.resumeHotkeys();
+    this.modal.dismiss('minimized');
   }
 
   /**

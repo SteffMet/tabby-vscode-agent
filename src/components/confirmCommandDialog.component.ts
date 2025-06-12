@@ -3,6 +3,7 @@ import { FormsModule } from '@angular/forms';
 import { NgbActiveModal, NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { CommonModule } from '@angular/common';
 import { HotkeysService } from 'tabby-core';
+import { MinimizedDialogManagerService } from '../services/minimizedDialogManager.service';
 
 /**
  * Dialog component for confirming command execution
@@ -28,10 +29,16 @@ export class ConfirmCommandDialogComponent implements AfterViewInit, OnDestroy {
   // Track if hotkeys are paused
   private hotkeysPaused = false;
 
+  // Dialog ID for minimize/restore functionality
+  public dialogId: string = '';
+
   constructor(
     public modal: NgbActiveModal,
     private hotkeysService: HotkeysService,
-  ) { }
+    private minimizedDialogManager: MinimizedDialogManagerService
+  ) {
+    this.dialogId = this.minimizedDialogManager.generateDialogId();
+  }
 
   /**
    * After view init, pause hotkeys and set up focus management
@@ -195,6 +202,36 @@ export class ConfirmCommandDialogComponent implements AfterViewInit, OnDestroy {
       rejected: true,
       rejectMessage: this.rejectMessage
     });
+  }
+
+  /**
+   * Minimize the dialog
+   */
+  minimize(): void {
+    console.log('Minimizing confirm command dialog');
+    
+    // We need to get the promise resolver from the DialogManagerService before dismissing
+    // Since we can't access it directly, we'll use a different approach
+    // Store a temporary reference that the DialogManagerService can access
+    (this.modal as any)._mcpPromiseResolver = null; // Will be set by DialogManagerService
+    
+    // Create minimized dialog object
+    const minimizedDialog = {
+      id: this.dialogId,
+      title: `Command: ${this.command.length > 40 ? this.command.substring(0, 40) + '...' : this.command}`,
+      component: ConfirmCommandDialogComponent,
+      instance: this,
+      modalRef: this.modal,
+      timestamp: Date.now()
+      // promiseResolver will be set by DialogManagerService
+    };
+    
+    // Add to minimized dialogs
+    this.minimizedDialogManager.minimizeDialog(minimizedDialog);
+    
+    // Dismiss the modal with 'minimized' reason
+    this.resumeHotkeys();
+    this.modal.dismiss('minimized');
   }
 
   /**

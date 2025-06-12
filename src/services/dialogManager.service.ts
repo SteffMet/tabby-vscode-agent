@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 import { NgbModal, NgbModalRef } from '@ng-bootstrap/ng-bootstrap';
 import { LogService, Logger } from 'tabby-core';
 import { Observable, Subject } from 'rxjs';
+import { MinimizedDialogManagerService } from './minimizedDialogManager.service';
 
 /**
  * Dialog request interface
@@ -68,7 +69,8 @@ export class DialogManagerService {
 
   constructor(
     private ngbModal: NgbModal,
-    log: LogService
+    log: LogService,
+    private minimizedDialogManager: MinimizedDialogManagerService
   ) {
     this.logger = log.create('dialogManager');
   }
@@ -175,7 +177,14 @@ export class DialogManagerService {
         },
         (reason) => {
           this.handleDialogClosed(null, reason);
-          request.reject(reason);
+          // Don't reject promise if dialog was minimized - keep it pending
+          if (reason !== 'minimized') {
+            request.reject(reason);
+          } else {
+            // For minimized dialogs, store the promise resolver immediately
+            console.log('Dialog minimized, storing promise resolver');
+            this.storePromiseResolverForMinimizedDialog(this.activeDialog, request);
+          }
         }
       );
     } catch (error) {
@@ -209,6 +218,62 @@ export class DialogManagerService {
         this.logger.debug(`Showing next dialog from queue, remaining: ${this.dialogQueue.length}`);
         setTimeout(() => this.showDialog(nextRequest), 100); // Small delay to ensure previous dialog is fully closed
       }
+    }
+  }
+
+  /**
+   * Store promise resolver for minimized dialog
+   */
+  private storePromiseResolverForMinimizedDialog(modalRef: NgbModalRef | null, request: DialogRequest): void {
+    console.log('storePromiseResolverForMinimizedDialog called');
+    
+    // Capture dialog ID before checking modalRef, as it might become null
+    let dialogId: string | null = null;
+    
+    if (modalRef && modalRef.componentInstance) {
+      dialogId = modalRef.componentInstance.dialogId;
+      console.log('Dialog ID from modal:', dialogId);
+    } else {
+      console.log('No modalRef or componentInstance, trying to find by other means');
+      
+      // Try to find the most recently added minimized dialog
+      const dialogs = this.minimizedDialogManager.dialogs;
+      if (dialogs.length > 0) {
+        // Get the most recent dialog (highest timestamp)
+        const mostRecent = dialogs.reduce((latest, current) => 
+          current.timestamp > latest.timestamp ? current : latest
+        );
+        dialogId = mostRecent.id;
+        console.log('Using most recent minimized dialog ID:', dialogId);
+      }
+    }
+    
+    if (!dialogId) {
+      console.log('No dialogId found');
+      return;
+    }
+
+    // Find the minimized dialog and update it with promise resolver
+    const dialogs = this.minimizedDialogManager.dialogs;
+    console.log('Current minimized dialogs:', dialogs.length);
+    console.log('Looking for dialog with ID:', dialogId);
+    
+    const dialog = dialogs.find(d => d.id === dialogId);
+    console.log('Found dialog:', !!dialog);
+    
+    if (dialog) {
+      console.log('Storing promise resolver for dialog:', dialog.id);
+      dialog.promiseResolver = {
+        resolve: request.resolve,
+        reject: request.reject
+      };
+      
+      // Update the dialog in the manager
+      this.minimizedDialogManager.minimizeDialog(dialog);
+      console.log('Promise resolver stored successfully');
+    } else {
+      console.log('Dialog not found in minimized dialogs list');
+      console.log('Available dialog IDs:', dialogs.map(d => d.id));
     }
   }
 }

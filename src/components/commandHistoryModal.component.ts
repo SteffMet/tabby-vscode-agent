@@ -171,12 +171,16 @@ import { CommandHistoryManagerService, CommandHistoryEntry } from '../services/c
     }
     
     .history-entry {
-      background-color: #f8f9fa;
-      transition: background-color 0.2s;
+      background-color: #ffffff;
+      border: 2px solid #dee2e6 !important;
+      transition: all 0.2s;
+      box-shadow: 0 2px 4px rgba(0,0,0,0.1);
     }
     
     .history-entry:hover {
-      background-color: #e9ecef;
+      background-color: #f8f9fa;
+      border-color: #007bff !important;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
     }
     
     .output-text {
@@ -185,25 +189,170 @@ import { CommandHistoryManagerService, CommandHistoryEntry } from '../services/c
       font-size: 0.85rem;
       white-space: pre-wrap;
       word-break: break-all;
+      background-color: #1a1a1a !important;
+      color: #ffffff !important;
+      border: 1px solid #333;
     }
     
     .command-section code {
       font-size: 0.9rem;
       word-break: break-all;
+      background-color: #f1f3f4 !important;
+      color: #212529 !important;
+      border: 1px solid #d0d7de;
+      font-weight: 600;
     }
     
     .modal-body {
       max-height: 70vh;
       overflow-y: auto;
+      background-color: #fafbfc;
     }
 
     .btn-group .btn {
       border-radius: 0.25rem;
       margin-left: 2px;
+      font-weight: 500;
     }
     
     .btn-group .btn:first-child {
       margin-left: 0;
+    }
+
+    .modal-header {
+      background-color: #007bff;
+      color: white;
+      border-bottom: 2px solid #0056b3;
+    }
+
+    .modal-header .modal-title {
+      font-weight: 600;
+      color: white;
+    }
+
+    .modal-header .btn-close {
+      filter: invert(1) grayscale(100%) brightness(200%);
+    }
+
+    .badge {
+      font-weight: 600;
+      font-size: 0.75rem;
+    }
+
+    .bg-success {
+      background-color: #28a745 !important;
+      color: white !important;
+    }
+
+    .bg-danger {
+      background-color: #dc3545 !important;
+      color: white !important;
+    }
+
+    .bg-warning {
+      background-color: #ffc107 !important;
+      color: #212529 !important;
+    }
+
+    .text-primary {
+      color: #0056b3 !important;
+      font-weight: 600;
+    }
+
+    .text-secondary {
+      color: #495057 !important;
+      font-weight: 600;
+    }
+
+    .text-muted {
+      color: #6c757d !important;
+      font-weight: 500;
+    }
+
+    .form-control, .form-select {
+      border: 2px solid #ced4da;
+      font-weight: 500;
+    }
+
+    .form-control:focus, .form-select:focus {
+      border-color: #007bff;
+      box-shadow: 0 0 0 0.2rem rgba(0, 123, 255, 0.25);
+    }
+
+    .input-group-text {
+      background-color: #e9ecef;
+      border: 2px solid #ced4da;
+      font-weight: 600;
+    }
+
+    .btn-outline-primary {
+      border-width: 2px;
+      font-weight: 600;
+    }
+
+    .btn-outline-secondary {
+      border-width: 2px;
+      font-weight: 600;
+    }
+
+    .btn-outline-danger {
+      border-width: 2px;
+      font-weight: 600;
+    }
+
+    .btn-secondary {
+      background-color: #495057;
+      border-color: #495057;
+      font-weight: 600;
+    }
+
+    .modal-footer {
+      background-color: #f8f9fa;
+      border-top: 2px solid #dee2e6;
+    }
+
+    /* Empty state styling */
+    .text-center.text-muted {
+      color: #495057 !important;
+    }
+
+    .text-center.text-muted .fas {
+      color: #6c757d;
+    }
+
+    /* Scrollbar styling for better contrast */
+    .history-list::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .history-list::-webkit-scrollbar-track {
+      background: #f1f1f1;
+    }
+
+    .history-list::-webkit-scrollbar-thumb {
+      background: #888;
+      border-radius: 4px;
+    }
+
+    .history-list::-webkit-scrollbar-thumb:hover {
+      background: #555;
+    }
+
+    .output-text::-webkit-scrollbar {
+      width: 6px;
+    }
+
+    .output-text::-webkit-scrollbar-track {
+      background: #333;
+    }
+
+    .output-text::-webkit-scrollbar-thumb {
+      background: #666;
+      border-radius: 3px;
+    }
+
+    .output-text::-webkit-scrollbar-thumb:hover {
+      background: #888;
     }
   `]
 })

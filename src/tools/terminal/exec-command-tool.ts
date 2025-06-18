@@ -35,20 +35,6 @@ export class ExecCommandTool extends BaseTool {
     this.outputStorage = outputStorage || new CommandOutputStorageService(logger);
   }
 
-  /**
-   * Simulates typing by sending input character by character with a delay
-   * @param session The terminal session
-   * @param text The text to type
-   * @param delayMs The delay between characters in milliseconds
-   * @returns Promise that resolves when typing is complete
-   */
-  private async simulateTyping(session: BaseTerminalTabComponentWithId, text: string, delayMs: number = this.DEFAULT_TYPING_DELAY): Promise<void> {
-    for (let i = 0; i < text.length; i++) {
-      session.tab.sendInput(text[i]);
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
   getTool() {
     return {
       name: 'exec_command',
@@ -258,13 +244,13 @@ POSSIBLE ERRORS:
           // Check if command contains newlines (multiple commands)
           if (command.includes('\n')) {
             // Send the command with typing simulation
-            await this.simulateTyping(session, `stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1; {
+            session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1; {
 echo "${startMarker}"
 ${trimmedCommand}
 }\n`);
           } else {
             // For single-line commands, use the simpler approach with proper semicolons
-              await this.simulateTyping(session, `stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1;echo "${startMarker}";\\
+            session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1;echo "${startMarker}";\\
 ${trimmedCommand}\n`);
           }
           // Send the detection script as input to the read command (will be hidden)

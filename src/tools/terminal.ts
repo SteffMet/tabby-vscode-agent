@@ -4,14 +4,15 @@ import { BaseTerminalTabComponent, XTermFrontend } from 'tabby-terminal';
 import { BaseToolCategory } from './base-tool-category';
 import { SerializeAddon } from '@xterm/addon-serialize';
 import { BehaviorSubject } from 'rxjs';
+import { map } from 'rxjs/operators';
 import { ShellContext } from './shell-strategy';
 import { McpLoggerService } from '../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../services/commandOutputStorage.service';
 import { CommandHistoryManagerService } from '../services/commandHistoryManager.service';
 import { DialogService } from '../services/dialog.service';
+import { RunningCommandsManagerService } from '../services/runningCommandsManager.service';
 import {
   SshSessionListTool,
-  AbortCommandTool,
   ExecCommandTool,
   GetTerminalBufferTool,
   GetCommandOutputTool
@@ -46,12 +47,17 @@ export interface ActiveCommand {
 export class ExecToolCategory extends BaseToolCategory {
   name: string = 'exec';
 
-  // Track active command execution
-  private _activeCommand: ActiveCommand | null = null;
-  private _activeCommandSubject = new BehaviorSubject<ActiveCommand | null>(null);
+  // Track active commands per session (sessionId -> ActiveCommand)
+  private _activeCommands = new Map<number, ActiveCommand>();
+  private _activeCommandsSubject = new BehaviorSubject<Map<number, ActiveCommand>>(new Map());
 
   // Observable for UI to subscribe to
-  public readonly activeCommand$ = this._activeCommandSubject.asObservable();
+  public readonly activeCommands$ = this._activeCommandsSubject.asObservable();
+  
+  // Legacy observable for backward compatibility (returns any active command)
+  public readonly activeCommand$ = this._activeCommandsSubject.asObservable().pipe(
+    map(commands => commands.size > 0 ? Array.from(commands.values())[0] : null)
+  );
 
   // Shell context for managing different shell types
   public shellContext = new ShellContext();
@@ -61,7 +67,8 @@ export class ExecToolCategory extends BaseToolCategory {
     logger: McpLoggerService,
     private config: ConfigService,
     private dialogService: DialogService,
-    private commandHistoryManager: CommandHistoryManagerService
+    private commandHistoryManager: CommandHistoryManagerService,
+    private runningCommandsManager: RunningCommandsManagerService
   ) {
     super(logger);
 
@@ -83,13 +90,13 @@ export class ExecToolCategory extends BaseToolCategory {
 
     // Create tool instances
     const sshSessionListTool = new SshSessionListTool(this, this.logger);
-    const abortCommandTool = new AbortCommandTool(this, this.logger);
     const execCommandTool = new ExecCommandTool(
       this,
       this.logger,
       this.config,
       this.dialogService,
       this.app,
+      this.runningCommandsManager,
       commandOutputStorage,
       this.commandHistoryManager
     );
@@ -98,38 +105,87 @@ export class ExecToolCategory extends BaseToolCategory {
 
     // Register tools
     this.registerTool(sshSessionListTool.getTool());
-    this.registerTool(abortCommandTool.getTool());
     this.registerTool(execCommandTool.getTool());
     this.registerTool(getTerminalBufferTool.getTool());
     this.registerTool(getCommandOutputTool.getTool());
   }
 
   /**
-   * Get current active command
+   * Get current active command (legacy - returns first active command)
    */
   public get activeCommand(): ActiveCommand | null {
-    return this._activeCommand;
+    return this._activeCommands.size > 0 ? Array.from(this._activeCommands.values())[0] : null;
   }
 
   /**
-   * Set active command and notify subscribers
+   * Get active command for specific session
+   */
+  public getActiveCommand(sessionId: number): ActiveCommand | null {
+    return this._activeCommands.get(sessionId) || null;
+  }
+
+  /**
+   * Set active command for a session and notify subscribers
    */
   public setActiveCommand(command: ActiveCommand | null): void {
-    this._activeCommand = command;
-    this._activeCommandSubject.next(command);
-    this.logger.debug(`Active command updated: ${command ? command.command : 'none'}`);
+    if (command) {
+      this._activeCommands.set(command.tabId, command);
+      this.logger.debug(`Active command set for session ${command.tabId}: ${command.command}`);
+    } else {
+      // Legacy behavior - if command is null, clear the first active command
+      if (this._activeCommands.size > 0) {
+        const firstSessionId = Array.from(this._activeCommands.keys())[0];
+        this._activeCommands.delete(firstSessionId);
+        this.logger.debug(`Active command cleared for session ${firstSessionId}`);
+      }
+    }
+    this._activeCommandsSubject.next(new Map(this._activeCommands));
   }
 
   /**
-   * Abort the current command if any
+   * Clear active command for specific session
+   */
+  public clearActiveCommand(sessionId: number): void {
+    if (this._activeCommands.has(sessionId)) {
+      this._activeCommands.delete(sessionId);
+      this._activeCommandsSubject.next(new Map(this._activeCommands));
+      this.logger.debug(`Active command cleared for session ${sessionId}`);
+    }
+  }
+
+  /**
+   * Abort command for specific session
+   */
+  public abortCommand(sessionId: number): void {
+    const activeCommand = this._activeCommands.get(sessionId);
+    if (activeCommand) {
+      // Find the terminal session for this command
+      const sessions = this.findAndSerializeTerminalSessions();
+      const session = sessions.find(s => s.id === sessionId);
+      
+      if (session) {
+        // Send Ctrl+C to interrupt the command
+        this.logger.debug(`Sending Ctrl+C to abort command in session ${sessionId}: ${activeCommand.command}`);
+        session.tab.sendInput('\x03'); // Ctrl+C
+      }
+      
+      // Call the abort handler which sets the aborted flag
+      activeCommand.abort();
+      
+      // Remove from active commands
+      this._activeCommands.delete(sessionId);
+      this._activeCommandsSubject.next(new Map(this._activeCommands));
+      this.logger.debug(`Command aborted for session ${sessionId}`);
+    }
+  }
+
+  /**
+   * Abort the current command if any (legacy method)
    */
   public abortCurrentCommand(): void {
-    if (this._activeCommand) {
-      // Call the abort handler which just sets the aborted flag
-      this._activeCommand.abort();
-      this._activeCommand = null;
-      this._activeCommandSubject.next(null);
-      this.logger.debug(`Command aborted by user`);
+    if (this._activeCommands.size > 0) {
+      const firstSessionId = Array.from(this._activeCommands.keys())[0];
+      this.abortCommand(firstSessionId);
     }
   }
 

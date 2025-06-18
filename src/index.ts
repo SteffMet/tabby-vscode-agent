@@ -20,6 +20,8 @@ import { DialogService } from './services/dialog.service';
 import { DialogManagerService } from './services/dialogManager.service';
 import { MinimizedDialogManagerService } from './services/minimizedDialogManager.service';
 import { CommandHistoryManagerService } from './services/commandHistoryManager.service';
+import { RunningCommandsManagerService } from './services/runningCommandsManager.service';
+import { RunningCommandsDialogComponent } from './components/runningCommandsDialog.component';
 
 // Import global styles
 import './styles.scss';
@@ -45,6 +47,7 @@ import './styles.scss';
     DialogManagerService,
     MinimizedDialogManagerService,
     CommandHistoryManagerService,
+    RunningCommandsManagerService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
@@ -53,12 +56,14 @@ import './styles.scss';
     ExecCommandButtonComponent,
     MinimizedDialogsModalComponent,
     CommandHistoryModalComponent,
+    RunningCommandsDialogComponent,
     McpSettingsTabComponent
   ],
   entryComponents: [
     ExecCommandButtonComponent,
     MinimizedDialogsModalComponent,
     CommandHistoryModalComponent,
+    RunningCommandsDialogComponent,
     McpSettingsTabComponent
   ],
   exports: [
@@ -122,3 +127,4 @@ export * from './services/mcpConfigProvider';
 export * from './services/dialog.service';
 export * from './services/dialogManager.service';
 export * from './services/commandHistoryManager.service';
+export * from './services/runningCommandsManager.service';

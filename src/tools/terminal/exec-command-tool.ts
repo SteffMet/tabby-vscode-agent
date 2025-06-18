@@ -9,6 +9,7 @@ import { CommandHistoryManagerService } from '../../services/commandHistoryManag
 import { escapeShellString } from '../../utils/escapeShellString';
 import { AppService, ConfigService } from 'tabby-core';
 import { DialogService } from '../../services/dialog.service';
+import { RunningCommandsManagerService } from '../../services/runningCommandsManager.service';
 
 /**
  * Tool for executing a command in a terminal session and retrieving the output.
@@ -30,6 +31,7 @@ export class ExecCommandTool extends BaseTool {
     private config: ConfigService,
     private dialogService: DialogService,
     private app: AppService,
+    private runningCommandsManager: RunningCommandsManagerService,
     outputStorage?: CommandOutputStorageService,
     commandHistoryManager?: CommandHistoryManagerService
   ) {
@@ -91,17 +93,14 @@ POSSIBLE ERRORS:
         tabId: z.string().optional().describe('The ID of the terminal tab where the command will be executed. If not provided, the currently focused terminal will be used. Get available IDs by calling get_ssh_session_list first. Example: "0" or "1".')
       },
       handler: async (params, extra) => {
+        let session; // Declare session at outer scope for catch/finally access
+        
         try {
           console.log('Params:', JSON.stringify(params));
           const { command, tabId, commandExplanation } = params;
           console.log(`Executing command: ${command}, tabId: ${tabId}`);
           if (commandExplanation) {
             console.log(`Command explanation: ${commandExplanation}`);
-          }
-
-          // Check if a command is already running
-          if (this.execToolCategory.activeCommand) {
-            return createErrorResponse('A command is already running. Abort it first.');
           }
 
           // Check if Pair Programming Mode is enabled
@@ -113,7 +112,6 @@ POSSIBLE ERRORS:
           const sessions = this.execToolCategory.findAndSerializeTerminalSessions();
 
           // If no tabId is provided, use the active tab
-          let session;
           if (tabId) {
             session = sessions.find(s => s.id.toString() === tabId);
             if (!session) {
@@ -132,6 +130,15 @@ POSSIBLE ERRORS:
           }
 
           this.logger.info(`Using terminal session ${session.id} (${session.tab.title})`);
+
+          // Check if a command is already running in this session and auto-abort it
+          const currentActiveCommand = this.execToolCategory.getActiveCommand(session.id);
+          if (currentActiveCommand) {
+            this.logger.info(`Auto-aborting currently running command in session ${session.id}: ${currentActiveCommand.command}`);
+            this.execToolCategory.abortCommand(session.id);
+            // Wait a bit for the abort to take effect
+            await new Promise(resolve => setTimeout(resolve, 500));
+          }
 
           // Show confirmation dialog if enabled
           if (showConfirmationDialog) {
@@ -243,6 +250,9 @@ POSSIBLE ERRORS:
             abort: abortHandler
           });
 
+          // Start tracking the command in running commands manager
+          this.runningCommandsManager.startCommand(session.id.toString(), command);
+
           // First determine which shell we're running in using read to hide commands
           const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
 
@@ -347,8 +357,7 @@ ${trimmedCommand}\n`);
             }
           }
 
-          // Clear active command
-          this.execToolCategory.setActiveCommand(null);
+          // Clear active command for this session - handled in finally block now
 
           if (aborted) {
             this.logger.info(`Command was aborted, retrieving partial output`);
@@ -561,8 +570,18 @@ ${trimmedCommand}\n`);
           });
         } catch (err) {
           this.logger.error(`Error executing command:`, err);
-          this.execToolCategory.setActiveCommand(null);
+          // Clear active command for this session
+          if (session) {
+            this.execToolCategory.clearActiveCommand(session.id);
+          }
           return createErrorResponse(`Failed to execute command: ${err.message || err}`);
+        } finally {
+          // Always clear active command when done (whether successful, aborted, or error)
+          if (session) {
+            this.execToolCategory.clearActiveCommand(session.id);
+            // Stop tracking the command in running commands manager
+            this.runningCommandsManager.endCommand(session.id.toString());
+          }
         }
       }
     };

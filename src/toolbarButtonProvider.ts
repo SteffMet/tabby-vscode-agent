@@ -6,10 +6,12 @@ import { MinimizedDialogsModalComponent } from './components/minimizedModal.comp
 import { MinimizedDialogManagerService } from './services/minimizedDialogManager.service';
 import { CommandHistoryModalComponent } from './components/commandHistoryModal.component';
 import { CommandHistoryManagerService } from './services/commandHistoryManager.service';
+import { RunningCommandsDialogComponent } from './components/runningCommandsDialog.component';
+import { RunningCommandsManagerService } from './services/runningCommandsManager.service';
 
 @Injectable()
 export class McpToolbarButtonProvider extends ToolbarButtonProvider {
-    private execCommandRunning = false;
+    private activeCommandsCount = 0;
     private minimizedDialogsCount = 0;
     private commandHistoryCount = 0;
     
@@ -17,13 +19,14 @@ export class McpToolbarButtonProvider extends ToolbarButtonProvider {
         private execToolCategory: ExecToolCategory,
         private modal: NgbModal,
         private minimizedDialogManager: MinimizedDialogManagerService,
-        private commandHistoryManager: CommandHistoryManagerService
+        private commandHistoryManager: CommandHistoryManagerService,
+        private runningCommandsManager: RunningCommandsManagerService
     ) {
         super();
         
-        // Subscribe to changes in active command
-        this.execToolCategory.activeCommand$.subscribe(command => {
-            this.execCommandRunning = !!command;
+        // Subscribe to changes in running commands
+        this.runningCommandsManager.runningCommands$.subscribe(commands => {
+            this.activeCommandsCount = commands.length;
         });
         
         // Subscribe to minimized dialogs changes
@@ -41,16 +44,14 @@ export class McpToolbarButtonProvider extends ToolbarButtonProvider {
         return [
             {
                 icon: `
-                    <svg width="16" height="16" viewBox="0 0 448 512" xmlns="http://www.w3.org/2000/svg">
-                        <path fill="currentColor" d="M432 256c0 17.7-14.3 32-32 32H48c-17.7 0-32-14.3-32-32s14.3-32 32-32h352c17.7 0 32 14.3 32 32z"/>
+                    <svg width="16" height="16" viewBox="0 0 512 512" xmlns="http://www.w3.org/2000/svg">
+                        <path fill="currentColor" d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512z${this.activeCommandsCount > 0 ? 'M224 160a32 32 0 1 1 64 0 32 32 0 1 1 -64 0zM288 192a32 32 0 1 0 -64 0 32 32 0 1 0 64 0zm-32 64c-17.7 0-32 14.3-32 32v96c0 17.7 14.3 32 32 32s32-14.3 32-32V288c0-17.7-14.3-32-32-32z' : 'M208 240c0 26.5 21.5 48 48 48s48-21.5 48-48c0-26.5-21.5-48-48-48s-48 21.5-48 48z'}"/>
                     </svg>
                 `,
                 weight: 5,
-                title: this.execCommandRunning ? 'Abort command (running)' : 'MCP Status (idle)',
+                title: this.activeCommandsCount > 0 ? `Running Commands (${this.activeCommandsCount})` : 'Running Commands',
                 click: () => {
-                    if (this.execCommandRunning) {
-                        this.execToolCategory.abortCurrentCommand();
-                    }
+                    this.showRunningCommandsModal();
                 }
             },
             {
@@ -91,6 +92,14 @@ export class McpToolbarButtonProvider extends ToolbarButtonProvider {
     private showCommandHistoryModal(): void {
         this.modal.open(CommandHistoryModalComponent, {
             size: 'xl',
+            backdrop: true,
+            keyboard: true
+        });
+    }
+    
+    private showRunningCommandsModal(): void {
+        this.modal.open(RunningCommandsDialogComponent, {
+            size: 'lg',
             backdrop: true,
             keyboard: true
         });

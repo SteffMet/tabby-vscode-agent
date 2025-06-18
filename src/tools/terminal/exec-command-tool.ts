@@ -5,6 +5,7 @@ import { BaseTool } from './base-tool';
 import { BaseTerminalTabComponentWithId, ExecToolCategory } from '../terminal';
 import { McpLoggerService } from '../../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../../services/commandOutputStorage.service';
+import { CommandHistoryManagerService } from '../../services/commandHistoryManager.service';
 import { escapeShellString } from '../../utils/escapeShellString';
 import { AppService, ConfigService } from 'tabby-core';
 import { DialogService } from '../../services/dialog.service';
@@ -19,6 +20,7 @@ export class ExecCommandTool extends BaseTool {
   // Maximum number of lines to return in a single response
   private readonly MAX_LINES_PER_RESPONSE = 250;
   private outputStorage: CommandOutputStorageService;
+  private commandHistoryManager: CommandHistoryManagerService;
   // Default typing delay in milliseconds
   private readonly DEFAULT_TYPING_DELAY = 1;
 
@@ -28,11 +30,17 @@ export class ExecCommandTool extends BaseTool {
     private config: ConfigService,
     private dialogService: DialogService,
     private app: AppService,
-    outputStorage?: CommandOutputStorageService
+    outputStorage?: CommandOutputStorageService,
+    commandHistoryManager?: CommandHistoryManagerService
   ) {
     super(logger);
     // If outputStorage is not provided, create a new instance
     this.outputStorage = outputStorage || new CommandOutputStorageService(logger);
+    // CommandHistoryManager should always be provided as singleton from DI
+    if (!commandHistoryManager) {
+      throw new Error('CommandHistoryManagerService must be provided');
+    }
+    this.commandHistoryManager = commandHistoryManager;
   }
 
   getTool() {
@@ -212,6 +220,7 @@ POSSIBLE ERRORS:
           const timestamp = Date.now();
           const startMarker = `_S${timestamp}`;
           const endMarker = `_E${timestamp}`;
+          const executionStartTime = Date.now();
 
           // Track exit code
           let exitCode: number | null = null;
@@ -379,6 +388,20 @@ ${trimmedCommand}\n`);
               tabId: session.id
             });
 
+            // Add to command history
+            const executionEndTime = Date.now();
+            this.commandHistoryManager.addCommand({
+              command,
+              output,
+              promptShell,
+              exitCode,
+              timestamp: executionStartTime,
+              aborted: true,
+              tabId: session.id.toString(),
+              tabTitle: session.tab.title,
+              duration: executionEndTime - executionStartTime
+            });
+
             const outputLines = output.split('\n');
             if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
               output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
@@ -456,6 +479,20 @@ ${trimmedCommand}\n`);
             timestamp: Date.now(),
             aborted: false,
             tabId: session.id
+          });
+
+          // Add to command history
+          const executionEndTime = Date.now();
+          this.commandHistoryManager.addCommand({
+            command,
+            output,
+            promptShell,
+            exitCode,
+            timestamp: executionStartTime,
+            aborted: false,
+            tabId: session.id.toString(),
+            tabTitle: session.tab.title,
+            duration: executionEndTime - executionStartTime
           });
 
           const outputLines = output.split('\n');

@@ -7,6 +7,7 @@ import { McpLoggerService } from './services/mcpLogger.service';
 import { ExecToolCategory } from './tools/terminal';
 import { ExecCommandButtonComponent } from './components/execCommandButton.component';
 import { MinimizedDialogsModalComponent } from './components/minimizedModal.component';
+import { CommandHistoryModalComponent } from './components/commandHistoryModal.component';
 import { McpToolbarButtonProvider } from './toolbarButtonProvider';
 import { McpSettingsTabProvider } from './settings';
 import { McpSettingsTabComponent } from './components/mcpSettingsTab.component';
@@ -18,6 +19,7 @@ import { NgbModule } from '@ng-bootstrap/ng-bootstrap';
 import { DialogService } from './services/dialog.service';
 import { DialogManagerService } from './services/dialogManager.service';
 import { MinimizedDialogManagerService } from './services/minimizedDialogManager.service';
+import { CommandHistoryManagerService } from './services/commandHistoryManager.service';
 
 // Import global styles
 import './styles.scss';
@@ -42,6 +44,7 @@ import './styles.scss';
     DialogService,
     DialogManagerService,
     MinimizedDialogManagerService,
+    CommandHistoryManagerService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
@@ -49,11 +52,13 @@ import './styles.scss';
   declarations: [
     ExecCommandButtonComponent,
     MinimizedDialogsModalComponent,
+    CommandHistoryModalComponent,
     McpSettingsTabComponent
   ],
   entryComponents: [
     ExecCommandButtonComponent,
     MinimizedDialogsModalComponent,
+    CommandHistoryModalComponent,
     McpSettingsTabComponent
   ],
   exports: [
@@ -116,3 +121,4 @@ export * from './type/types';
 export * from './services/mcpConfigProvider';
 export * from './services/dialog.service';
 export * from './services/dialogManager.service';
+export * from './services/commandHistoryManager.service';

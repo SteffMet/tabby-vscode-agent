@@ -7,6 +7,7 @@ import { BehaviorSubject } from 'rxjs';
 import { ShellContext } from './shell-strategy';
 import { McpLoggerService } from '../services/mcpLogger.service';
 import { CommandOutputStorageService } from '../services/commandOutputStorage.service';
+import { CommandHistoryManagerService } from '../services/commandHistoryManager.service';
 import { DialogService } from '../services/dialog.service';
 import {
   SshSessionListTool,
@@ -59,7 +60,8 @@ export class ExecToolCategory extends BaseToolCategory {
     private app: AppService,
     logger: McpLoggerService,
     private config: ConfigService,
-    private dialogService: DialogService
+    private dialogService: DialogService,
+    private commandHistoryManager: CommandHistoryManagerService
   ) {
     super(logger);
 
@@ -88,7 +90,8 @@ export class ExecToolCategory extends BaseToolCategory {
       this.config,
       this.dialogService,
       this.app,
-      commandOutputStorage
+      commandOutputStorage,
+      this.commandHistoryManager
     );
     const getTerminalBufferTool = new GetTerminalBufferTool(this, this.logger);
     const getCommandOutputTool = new GetCommandOutputTool(this.logger, commandOutputStorage);

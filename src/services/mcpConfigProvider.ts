@@ -24,6 +24,9 @@ export class McpConfigProvider extends ConfigProvider {
       }
     },
     hotkeys: {
+      'mcp-abort-command': [
+        'Ctrl-Shift-C',  // Sử dụng Ctrl-Shift-C để tránh conflict với Ctrl-C thông thường
+      ],
     },
   };
 

@@ -171,12 +171,39 @@ export class ShellContext {
    * @returns The detected shell type
    */
   detectShellType(terminalOutput: string): string | null {
-    const lines = stripAnsi(terminalOutput).split('\n');
-    if (lines[lines.length - 1].startsWith('SHELL_TYPE=')) {
-      const shellType = lines[lines.length - 1].split('=')[1].trim();
-      console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
-      return shellType;
+    try {
+      if (!terminalOutput || typeof terminalOutput !== 'string') {
+        console.warn('[DEBUG] Invalid terminal output provided for shell detection');
+        return null;
+      }
+
+      const lines = stripAnsi(terminalOutput).split('\n');
+      
+      if (!lines || lines.length === 0) {
+        console.warn('[DEBUG] No lines found in terminal output');
+        return null;
+      }
+
+      // Check the last 3 lines for SHELL_TYPE= pattern
+      for (let i = Math.max(0, lines.length - 3); i < lines.length; i++) {
+        const line = lines[i];
+        if (line && line.startsWith('SHELL_TYPE=')) {
+          const parts = line.split('=');
+          if (parts.length >= 2) {
+            const shellType = parts[1].trim();
+            if (shellType) {
+              console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
+              return shellType;
+            }
+          }
+        }
+      }
+
+      console.warn('[DEBUG] No SHELL_TYPE= pattern found in terminal output');
+      return null;
+    } catch (error) {
+      console.error('[DEBUG] Error detecting shell type:', error);
+      return null;
     }
-    return null;
   }
 }

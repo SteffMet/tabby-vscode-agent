@@ -202,42 +202,16 @@ ${trimmedCommand}
 }\n`);
       } else {
         // For single-line commands, use the simpler approach with proper semicolons
-        session.tab.sendInput(`stty -echo;read m;read ds;eval "$ds";read ss;eval "$ss";stty echo;\\
+        session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;echo "${startMarker}";\\
 ${trimmedCommand}\n`);
       }
-      let attempts = 0;
-      const maxAttempts = 50;
-      session.tab.sendInput(`echo "${startMarker}"\n`);
 
-      let hasStarted = false;
-      while (!hasStarted && attempts < maxAttempts) {
-        await new Promise(resolve => setTimeout(resolve, 100));
-        const textBeforeSetup = this.execToolCategory.getTerminalBufferText(session);
-        const cleanTextBeforeSetup = stripAnsi(textBeforeSetup);
-        const lines = cleanTextBeforeSetup.split('\n');
-        hasStarted = lines.length > 0 && lines[lines.length - 1].includes(startMarker);
-        attempts++;
-      }
-      if (!hasStarted) {
-        if (retryAttempt < this.MAX_RETRY_ATTEMPTS) {
-          this.logger.warn(`Command did not start after ${maxAttempts} attempts, retrying...`);
-          return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
-        } else {
-          this.logger.error(`Command did not start after ${maxAttempts} attempts, aborting command`);
-          await this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled); // Cancel command, do not return anything
-          return createJsonResponse({
-            output: `The command failed to start after ${maxAttempts} attempts. Aborting. It may have been started in a new shell or encountered an unexpected error and exited.`,
-            aborted: true,
-            exitCode: null
-          });
-        }
-      }
-      
       // Send the detection script as input to the read command (will be hidden)
       session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
-
+      
+      let attempts = 0;
+      const maxAttempts = 50;
       let shellType: string | null = null;
-
       
       while (shellType === null && attempts < maxAttempts) {
         await new Promise(resolve => setTimeout(resolve, 100));
@@ -256,7 +230,12 @@ ${trimmedCommand}\n`);
           return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
         } else {
           this.logger.error(`Failed to detect shell type after ${maxAttempts} attempts, aborting command`);
-          return this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled);
+          await this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled); // Cancel command, do not return anything
+          return createJsonResponse({
+            output: `Command did not start after ${maxAttempts} attempts, aborting command, maybe it got error on escape sequence.`,
+            aborted: true,
+            exitCode: null
+          });
         }
       }
 

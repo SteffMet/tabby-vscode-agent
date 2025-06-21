@@ -1,7 +1,7 @@
 import { NgModule } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
-import TabbyCoreModule, { AppService, ConfigProvider, ConfigService, ToolbarButtonProvider, HostWindowService } from 'tabby-core';
+import TabbyCoreModule, { AppService, ConfigProvider, ConfigService, ToolbarButtonProvider, HostWindowService, HotkeyProvider } from 'tabby-core';
 import { McpService } from './services/mcpService';
 import { McpLoggerService } from './services/mcpLogger.service';
 import { ExecToolCategory } from './tools/terminal';
@@ -22,6 +22,8 @@ import { MinimizedDialogManagerService } from './services/minimizedDialogManager
 import { CommandHistoryManagerService } from './services/commandHistoryManager.service';
 import { RunningCommandsManagerService } from './services/runningCommandsManager.service';
 import { RunningCommandsDialogComponent } from './components/runningCommandsDialog.component';
+import { McpHotkeyService } from './services/mcpHotkey.service';
+import { McpHotkeyProvider } from './services/mcpHotkeyProvider.service';
 
 // Import global styles
 import './styles.scss';
@@ -48,9 +50,11 @@ import './styles.scss';
     MinimizedDialogManagerService,
     CommandHistoryManagerService,
     RunningCommandsManagerService,
+    McpHotkeyService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
+    { provide: HotkeyProvider, useClass: McpHotkeyProvider, multi: true },
   ],
   declarations: [
     ExecCommandButtonComponent,
@@ -75,13 +79,14 @@ export default class McpModule {
    * Simple constructor for module initialization
    * Server initialization is handled by the toolbar button provider
    */
-  private constructor(
-    private app: AppService,
-    private config: ConfigService,
-    private mcpService: McpService,
-    private logger: McpLoggerService,
-    private hostWindow: HostWindowService
-  ) {
+      private constructor(
+        private app: AppService,
+        private config: ConfigService,
+        private mcpService: McpService,
+        private logger: McpLoggerService,
+        private hostWindow: HostWindowService,
+        private mcpHotkeyService: McpHotkeyService
+    ) {
     console.log('[McpModule] Module initialized');
 
         // Initialize the server properly after app and config are ready
@@ -128,3 +133,5 @@ export * from './services/dialog.service';
 export * from './services/dialogManager.service';
 export * from './services/commandHistoryManager.service';
 export * from './services/runningCommandsManager.service';
+export * from './services/mcpHotkey.service';
+export * from './services/mcpHotkeyProvider.service';

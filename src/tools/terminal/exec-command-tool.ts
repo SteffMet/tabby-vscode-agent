@@ -24,6 +24,8 @@ export class ExecCommandTool extends BaseTool {
   private commandHistoryManager: CommandHistoryManagerService;
   // Default typing delay in milliseconds
   private readonly DEFAULT_TYPING_DELAY = 1;
+  // Maximum retry attempts
+  private readonly MAX_RETRY_ATTEMPTS = 3;
 
   constructor(
     private execToolCategory: ExecToolCategory,
@@ -45,6 +47,565 @@ export class ExecCommandTool extends BaseTool {
     this.commandHistoryManager = commandHistoryManager;
   }
 
+  /**
+   * Execute command with retry logic
+   */
+  private async executeCommandWithRetry(
+    command: string,
+    session: any,
+    commandExplanation?: string,
+    retryAttempt: number = 1
+  ): Promise<any> {
+    try {
+      this.logger.info(`Executing command (attempt ${retryAttempt}/${this.MAX_RETRY_ATTEMPTS}): ${command}`);
+
+      // Check if Pair Programming Mode is enabled
+      const pairProgrammingEnabled = this.config.store.mcp?.pairProgrammingMode?.enabled === true;
+      const showConfirmationDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showConfirmationDialog !== false;
+      const autoFocusTerminal = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.autoFocusTerminal !== false;
+
+      // Check if a command is already running in this session and auto-abort it
+      const currentActiveCommand = this.execToolCategory.getActiveCommand(session.id);
+      if (currentActiveCommand) {
+        this.logger.info(`Auto-aborting currently running command in session ${session.id}: ${currentActiveCommand.command}`);
+        this.execToolCategory.abortCommand(session.id);
+        // Wait a bit for the abort to take effect
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+
+      // Show confirmation dialog if enabled (only on first attempt)
+      if (showConfirmationDialog && retryAttempt === 1) {
+        try {
+          const result = await this.dialogService.showConfirmCommandDialog(
+            command,
+            session.id,
+            session.tab.title,
+            commandExplanation
+          );
+
+          if (!result || !result.confirmed) {
+            // Check if it was rejected with a message
+            if (result && result.rejected && result.rejectMessage) {
+              this.logger.info(`Command execution rejected by user: ${result.rejectMessage}`);
+              return createJsonResponse({
+                output: `Command execution rejected: ${result.rejectMessage}`,
+                aborted: true,
+                exitCode: null,
+                userFeedback: {
+                  accepted: false,
+                  message: result.rejectMessage
+                }
+              });
+            } else {
+              // Regular cancellation
+              this.logger.info('Command execution cancelled by user');
+              return createJsonResponse({
+                output: 'Command execution cancelled by user',
+                aborted: true,
+                exitCode: null
+              });
+            }
+          }
+        } catch (error) {
+          this.logger.error('Error showing confirmation dialog:', error);
+          // Continue with execution if dialog fails
+        }
+      }
+
+      // Focus terminal if enabled (only on first attempt)
+      if (autoFocusTerminal && retryAttempt === 1) {
+        try {
+          // First, select the tab to make it active
+          this.app.selectTab(session.tabParent);
+
+          // Wait for the tab to be selected and focused
+          await new Promise(resolve => setTimeout(resolve, 300));
+
+          // Try to focus the tab directly
+          if (session.tab && typeof session.tab.focus === 'function') {
+            session.tab.focus();
+          }
+
+          // Wait a bit more to ensure focus is complete
+          await new Promise(resolve => setTimeout(resolve, 200));
+
+          // Check if the tab is focused
+          const isFocused = session.tab.hasFocus;
+          if (!isFocused) {
+            this.logger.warn('Terminal tab may not be properly focused, trying again');
+
+            // Try one more time with a longer delay
+            await new Promise(resolve => setTimeout(resolve, 500));
+
+            if (session.tab && typeof session.tab.focus === 'function') {
+              session.tab.focus();
+            }
+
+            // Final check
+            if (!session.tab.hasFocus) {
+              this.logger.warn('Terminal tab still not focused after retry');
+            } else {
+              this.logger.info('Terminal tab focused successfully after retry');
+            }
+          } else {
+            this.logger.info('Terminal tab focused successfully');
+          }
+        } catch (error) {
+          this.logger.error('Error focusing terminal:', error);
+          // Continue with execution if focus fails
+        }
+      }
+
+      // Generate unique markers for this command
+      const timestamp = Date.now();
+      const startMarker = `_S${timestamp}`;
+      const endMarker = `_E${timestamp}`;
+      const executionStartTime = Date.now();
+
+      // Track exit code
+      let exitCode: number | null = null;
+      let promptShell: string | null = null;
+
+      // Create abort controller for this command
+      let aborted = false;
+      const abortHandler = () => {
+        aborted = true;
+        // Do not send Ctrl+C here, just mark as aborted
+      };
+
+      // Set active command
+      this.execToolCategory.setActiveCommand({
+        tabId: session.id,
+        command,
+        timestamp,
+        startMarker,
+        endMarker,
+        abort: abortHandler
+      });
+
+      // Start tracking the command in running commands manager
+      this.runningCommandsManager.startCommand(session.id.toString(), command);
+
+      // First determine which shell we're running in using read to hide commands
+      const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
+
+      session.tab.sendInput('\x03');
+      await new Promise(resolve => setTimeout(resolve, 100));
+      const trimmedCommand = command.endsWith('\n') ? command.slice(0, -1) : command;
+      // First send a read command that will hide the detection script - more shell compatible approach
+      // Check if command contains newlines (multiple commands)
+      if (command.includes('\n')) {
+        // Send the command with typing simulation
+        session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo; {
+echo "${startMarker}"
+${trimmedCommand}
+}\n`);
+      } else {
+        // For single-line commands, use the simpler approach with proper semicolons
+        session.tab.sendInput(`stty -echo;read m;read ds;eval "$ds";read ss;eval "$ss";stty echo;\\
+${trimmedCommand}\n`);
+      }
+      let attempts = 0;
+      const maxAttempts = 50;
+      session.tab.sendInput(`echo "${startMarker}"\n`);
+
+      let hasStarted = false;
+      while (!hasStarted && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const textBeforeSetup = this.execToolCategory.getTerminalBufferText(session);
+        const cleanTextBeforeSetup = stripAnsi(textBeforeSetup);
+        const lines = cleanTextBeforeSetup.split('\n');
+        hasStarted = lines.length > 0 && lines[lines.length - 1].includes(startMarker);
+        attempts++;
+      }
+      if (!hasStarted) {
+        if (retryAttempt < this.MAX_RETRY_ATTEMPTS) {
+          this.logger.warn(`Command did not start after ${maxAttempts} attempts, retrying...`);
+          return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
+        } else {
+          this.logger.error(`Command did not start after ${maxAttempts} attempts, aborting command`);
+          await this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled); // Cancel command, do not return anything
+          return createJsonResponse({
+            output: `The command failed to start after ${maxAttempts} attempts. Aborting. It may have been started in a new shell or encountered an unexpected error and exited.`,
+            aborted: true,
+            exitCode: null
+          });
+        }
+      }
+      
+      // Send the detection script as input to the read command (will be hidden)
+      session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
+
+      let shellType: string | null = null;
+
+      
+      while (shellType === null && attempts < maxAttempts) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+        // Get terminal buffer to check shell type
+        const textAfterSetup = this.execToolCategory.getTerminalBufferText(session);
+        
+        // Determine shell type from output
+        shellType = this.execToolCategory.shellContext.detectShellType(textAfterSetup);
+        attempts++;
+        this.logger.info(`Shell type detection attempt ${attempts}: ${shellType}`);
+      }
+      
+      if (shellType === null) {
+        if (retryAttempt < this.MAX_RETRY_ATTEMPTS) {
+          this.logger.warn(`Failed to detect shell type after ${maxAttempts} attempts, retrying...`);
+          return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
+        } else {
+          this.logger.error(`Failed to detect shell type after ${maxAttempts} attempts, aborting command`);
+          return this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled);
+        }
+      }
+
+      // Get the appropriate shell strategy
+      const shellStrategy = this.execToolCategory.shellContext.getStrategy(shellType ?? 'unknown');
+
+      // Get setup script and command prefix
+      const setupScript = shellStrategy.getSetupScript(startMarker, endMarker);
+
+      // Send the actual setup script (will be hidden by read)
+      session.tab.sendInput(`${escapeShellString(setupScript)}\n`);
+
+      // Wait for command output
+      let output = '';
+      let commandStarted = false;
+      let commandFinished = false;
+
+      while (!commandFinished && !aborted) {
+        await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
+
+        // Get terminal buffer
+        const textAfter = this.execToolCategory.getTerminalBufferText(session);
+
+        // Clean ANSI codes and process output
+        const cleanTextAfter = stripAnsi(textAfter);
+        const lines = cleanTextAfter.split('\n');
+
+        let promptIndex = -1;
+        // Find start and end markers
+        let startIndex = -1;
+        let endIndex = -1;
+
+        for (let i = lines.length - 1; i >= 0; i--) {
+          if (lines[i].startsWith(startMarker)) {
+            startIndex = i;
+            commandStarted = true;
+            for (let j = startIndex - 1; j >= 0; j--) {
+              if (lines[j].includes(startMarker)) {
+                promptIndex = j;
+                break;
+              }
+            }
+            for (let j = startIndex + 1; j < lines.length; j++) {
+              if (lines[j].includes(endMarker)) {
+                endIndex = j;
+                commandFinished = true;
+                break;
+              }
+            }
+            break;
+          }
+        }
+
+        // Extract output between markers
+        if (commandStarted && commandFinished && startIndex !== -1 && endIndex !== -1) {
+          const commandOutput = lines.slice(startIndex + 1, endIndex)
+            .filter((line: string) => !line.includes(startMarker) && !line.includes(endMarker))
+            .join('\n')
+            .trim();
+
+          if (promptIndex !== -1) {
+            promptShell = lines[promptIndex].trim();
+          }
+          // Extract exit code if available
+          for (let i = endIndex; i < Math.min(endIndex + 5, lines.length); i++) {
+            if (lines[i].startsWith('exit_code:')) {
+              exitCode = parseInt(lines[i].split(':')[1].trim(), 10);
+              break;
+            }
+          }
+
+          output = commandOutput;
+          break;
+        }
+      }
+
+      if (aborted) {
+        return this.handleAbortedCommand(command, session, startMarker, executionStartTime, pairProgrammingEnabled);
+      }
+
+      // Check if command execution failed and should retry
+      if (!commandStarted || !commandFinished) {
+        if (retryAttempt < this.MAX_RETRY_ATTEMPTS) {
+          this.logger.warn(`Command execution failed (attempt ${retryAttempt}), retrying...`);
+          // Clear active command before retry
+          this.execToolCategory.clearActiveCommand(session.id);
+          this.runningCommandsManager.endCommand(session.id.toString());
+          
+          // Wait before retry
+          await new Promise(resolve => setTimeout(resolve, 1000));
+          
+          // Recursive retry
+          return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
+        } else {
+          throw new Error(`Command execution failed after ${this.MAX_RETRY_ATTEMPTS} attempts`);
+        }
+      }
+
+      this.logger.info(`Command executed successfully: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
+
+      return this.handleSuccessfulCommand(command, output, promptShell, exitCode, session, executionStartTime, pairProgrammingEnabled);
+
+    } catch (error) {
+      // Clear active command on error
+      this.execToolCategory.clearActiveCommand(session.id);
+      this.runningCommandsManager.endCommand(session.id.toString());
+      
+      if (retryAttempt < this.MAX_RETRY_ATTEMPTS) {
+        this.logger.warn(`Command execution error (attempt ${retryAttempt}): ${error.message}, retrying...`);
+        
+        // Wait before retry
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        
+        // Recursive retry
+        return this.executeCommandWithRetry(command, session, commandExplanation, retryAttempt + 1);
+      } else {
+        this.logger.error(`Command execution failed after ${this.MAX_RETRY_ATTEMPTS} attempts:`, error);
+        throw error;
+      }
+    } finally {
+      // Always clear active command when done (whether successful, aborted, or error)
+      this.execToolCategory.clearActiveCommand(session.id);
+      this.runningCommandsManager.endCommand(session.id.toString());
+    }
+  }
+
+  /**
+   * Handle aborted command logic
+   */
+  private async handleAbortedCommand(
+    command: string,
+    session: any,
+    startMarker: string,
+    executionStartTime: number,
+    pairProgrammingEnabled: boolean
+  ): Promise<any> {
+    this.logger.info(`Command was aborted, retrieving partial output`);
+
+    const textAfter = this.execToolCategory.getTerminalBufferText(session);
+    const cleanTextAfter = stripAnsi(textAfter);
+    const lines = cleanTextAfter.split('\n');
+
+    // Find start marker
+    let startIndex = -1;
+    for (let i = 0; i < lines.length; i++) {
+      if (lines[i].includes(startMarker)) {
+        startIndex = i;
+        break;
+      }
+    }
+
+    let output = '';
+    if (startIndex !== -1) {
+      // Get everything from start marker to end
+      output = lines.slice(startIndex + 1)
+        .filter((line: string) => !line.includes(startMarker))
+        .join('\n')
+        .trim();
+    } else {
+      // If no start marker found, return whole buffer
+      output = cleanTextAfter;
+    }
+
+    // Store the output in the storage service
+    const outputId = this.outputStorage.storeOutput({
+      command,
+      output,
+      promptShell: null,
+      exitCode: null,
+      timestamp: Date.now(),
+      aborted: true,
+      tabId: session.id
+    });
+
+    // Add to command history
+    const executionEndTime = Date.now();
+    this.commandHistoryManager.addCommand({
+      command,
+      output,
+      promptShell: null,
+      exitCode: null,
+      timestamp: executionStartTime,
+      aborted: true,
+      tabId: session.id.toString(),
+      tabTitle: session.tab.title,
+      duration: executionEndTime - executionStartTime
+    });
+
+    const outputLines = output.split('\n');
+    if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
+      output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
+    }
+
+    // Show result dialog if enabled
+    const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
+    if (showResultDialog) {
+      try {
+        const result = await this.dialogService.showCommandResultDialog(
+          command,
+          output,
+          null,
+          true // aborted
+        );
+
+        if (result) {
+          if (result.accepted && result.userMessage) {
+            return createJsonResponse({
+              output: output,
+              promptShell: null,
+              exitCode: null,
+              aborted: true,
+              outputId,
+              message: result.userMessage,
+              userFeedback: {
+                accepted: true,
+                message: result.userMessage
+              }
+            });
+          } else if (result.accepted === false && result.rejectionMessage) {
+            return createJsonResponse({
+              output: output,
+              promptShell: null,
+              exitCode: null,
+              aborted: true,
+              outputId,
+              message: `Command rejected: ${result.rejectionMessage}`,
+              userFeedback: {
+                accepted: false,
+                message: result.rejectionMessage
+              }
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error showing result dialog:', error);
+      }
+    }
+
+    return createJsonResponse({
+      output: output,
+      promptShell: null,
+      exitCode: null,
+      aborted: true,
+      outputId,
+      message: outputLines.length > this.MAX_LINES_PER_RESPONSE
+        ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
+        : '',
+    });
+  }
+
+  /**
+   * Handle successful command execution
+   */
+  private async handleSuccessfulCommand(
+    command: string,
+    output: string,
+    promptShell: string | null,
+    exitCode: number | null,
+    session: any,
+    executionStartTime: number,
+    pairProgrammingEnabled: boolean
+  ): Promise<any> {
+    // Store the output in the storage service
+    const outputId = this.outputStorage.storeOutput({
+      command,
+      output,
+      promptShell,
+      exitCode,
+      timestamp: Date.now(),
+      aborted: false,
+      tabId: session.id
+    });
+
+    // Add to command history
+    const executionEndTime = Date.now();
+    this.commandHistoryManager.addCommand({
+      command,
+      output,
+      promptShell,
+      exitCode,
+      timestamp: executionStartTime,
+      aborted: false,
+      tabId: session.id.toString(),
+      tabTitle: session.tab.title,
+      duration: executionEndTime - executionStartTime
+    });
+
+    const outputLines = output.split('\n');
+    if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
+      output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
+    }
+
+    // Show result dialog if enabled
+    const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
+    if (showResultDialog) {
+      try {
+        const result = await this.dialogService.showCommandResultDialog(
+          command,
+          output,
+          exitCode,
+          false // not aborted
+        );
+
+        if (result) {
+          if (result.accepted && result.userMessage) {
+            return createJsonResponse({
+              output: output,
+              promptShell,
+              exitCode,
+              aborted: false,
+              outputId,
+              message: result.userMessage,
+              userFeedback: {
+                accepted: true,
+                message: result.userMessage
+              }
+            });
+          } else if (result.accepted === false && result.rejectionMessage) {
+            return createJsonResponse({
+              output: output,
+              promptShell,
+              exitCode,
+              aborted: false,
+              outputId,
+              message: `Command rejected: ${result.rejectionMessage}`,
+              userFeedback: {
+                accepted: false,
+                message: result.rejectionMessage
+              }
+            });
+          }
+        }
+      } catch (error) {
+        this.logger.error('Error showing result dialog:', error);
+      }
+    }
+
+    return createJsonResponse({
+      output: output,
+      promptShell,
+      exitCode,
+      aborted: false,
+      outputId,
+      message: outputLines.length > this.MAX_LINES_PER_RESPONSE
+        ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
+        : '',
+    });
+  }
+
   getTool() {
     return {
       name: 'exec_command',
@@ -60,6 +621,7 @@ LIMITATIONS:
 - Only one command can run at a time
 - Commands with very long output (>250 lines) will be truncated
 - Some interactive commands may not work as expected
+- Automatic retry up to 3 times on execution failures
 
 RETURNS:
 {
@@ -103,11 +665,6 @@ POSSIBLE ERRORS:
             console.log(`Command explanation: ${commandExplanation}`);
           }
 
-          // Check if Pair Programming Mode is enabled
-          const pairProgrammingEnabled = this.config.store.mcp?.pairProgrammingMode?.enabled === true;
-          const showConfirmationDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showConfirmationDialog !== false;
-          const autoFocusTerminal = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.autoFocusTerminal !== false;
-
           // Find all terminal sessions
           const sessions = this.execToolCategory.findAndSerializeTerminalSessions();
 
@@ -131,457 +688,12 @@ POSSIBLE ERRORS:
 
           this.logger.info(`Using terminal session ${session.id} (${session.tab.title})`);
 
-          // Check if a command is already running in this session and auto-abort it
-          const currentActiveCommand = this.execToolCategory.getActiveCommand(session.id);
-          if (currentActiveCommand) {
-            this.logger.info(`Auto-aborting currently running command in session ${session.id}: ${currentActiveCommand.command}`);
-            this.execToolCategory.abortCommand(session.id);
-            // Wait a bit for the abort to take effect
-            await new Promise(resolve => setTimeout(resolve, 500));
-          }
+          // Execute command with retry logic
+          return await this.executeCommandWithRetry(command, session, commandExplanation);
 
-          // Show confirmation dialog if enabled
-          if (showConfirmationDialog) {
-            try {
-              const result = await this.dialogService.showConfirmCommandDialog(
-                command,
-                session.id,
-                session.tab.title,
-                commandExplanation
-              );
-
-              if (!result || !result.confirmed) {
-                // Check if it was rejected with a message
-                if (result && result.rejected && result.rejectMessage) {
-                  this.logger.info(`Command execution rejected by user: ${result.rejectMessage}`);
-                  return createJsonResponse({
-                    output: `Command execution rejected: ${result.rejectMessage}`,
-                    aborted: true,
-                    exitCode: null,
-                    userFeedback: {
-                      accepted: false,
-                      message: result.rejectMessage
-                    }
-                  });
-                } else {
-                  // Regular cancellation
-                  this.logger.info('Command execution cancelled by user');
-                  return createJsonResponse({
-                    output: 'Command execution cancelled by user',
-                    aborted: true,
-                    exitCode: null
-                  });
-                }
-              }
-            } catch (error) {
-              this.logger.error('Error showing confirmation dialog:', error);
-              // Continue with execution if dialog fails
-            }
-          }
-
-          // Focus terminal if enabled
-          if (autoFocusTerminal) {
-            try {
-              // First, select the tab to make it active
-              this.app.selectTab(session.tabParent);
-
-              // Wait for the tab to be selected and focused
-              await new Promise(resolve => setTimeout(resolve, 300));
-
-              // Try to focus the tab directly
-              if (session.tab && typeof session.tab.focus === 'function') {
-                session.tab.focus();
-              }
-
-              // Wait a bit more to ensure focus is complete
-              await new Promise(resolve => setTimeout(resolve, 200));
-
-              // Check if the tab is focused
-              const isFocused = session.tab.hasFocus;
-              if (!isFocused) {
-                this.logger.warn('Terminal tab may not be properly focused, trying again');
-
-                // Try one more time with a longer delay
-                await new Promise(resolve => setTimeout(resolve, 500));
-
-                if (session.tab && typeof session.tab.focus === 'function') {
-                  session.tab.focus();
-                }
-
-                // Final check
-                if (!session.tab.hasFocus) {
-                  this.logger.warn('Terminal tab still not focused after retry');
-                } else {
-                  this.logger.info('Terminal tab focused successfully after retry');
-                }
-              } else {
-                this.logger.info('Terminal tab focused successfully');
-              }
-            } catch (error) {
-              this.logger.error('Error focusing terminal:', error);
-              // Continue with execution if focus fails
-            }
-          }
-
-          // Generate unique markers for this command
-          const timestamp = Date.now();
-          const startMarker = `_S${timestamp}`;
-          const endMarker = `_E${timestamp}`;
-          const executionStartTime = Date.now();
-
-          // Track exit code
-          let exitCode: number | null = null;
-          let promptShell: string | null = null;
-
-          // Create abort controller for this command
-          let aborted = false;
-          const abortHandler = () => {
-            aborted = true;
-            // Do not send Ctrl+C here, just mark as aborted
-          };
-
-          // Set active command
-          this.execToolCategory.setActiveCommand({
-            tabId: session.id,
-            command,
-            timestamp,
-            startMarker,
-            endMarker,
-            abort: abortHandler
-          });
-
-          // Start tracking the command in running commands manager
-          this.runningCommandsManager.startCommand(session.id.toString(), command);
-
-          // First determine which shell we're running in using read to hide commands
-          const detectShellScript = this.execToolCategory.shellContext.getShellDetectionScript();
-
-          session.tab.sendInput('\x03');
-          await new Promise(resolve => setTimeout(resolve, 100));
-          const trimmedCommand = command.endsWith('\n') ? command.slice(0, -1) : command;
-          // First send a read command that will hide the detection script - more shell compatible approach
-          // Check if command contains newlines (multiple commands)
-          if (command.includes('\n')) {
-            // Send the command with typing simulation
-            session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1; {
-echo "${startMarker}"
-${trimmedCommand}
-}\n`);
-          } else {
-            // For single-line commands, use the simpler approach with proper semicolons
-            session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;touch "$__TF" > /dev/null 2>&1;echo "${startMarker}";\\
-${trimmedCommand}\n`);
-          }
-          // Send the detection script as input to the read command (will be hidden)
-          session.tab.sendInput(`${escapeShellString(detectShellScript)}\n`);
-
-          await new Promise(resolve => setTimeout(resolve, 100));
-          // Get terminal buffer to check shell type
-          const textBeforeSetup = this.execToolCategory.getTerminalBufferText(session);
-
-          // Determine shell type from output
-          const shellType = this.execToolCategory.shellContext.detectShellType(textBeforeSetup);
-          this.logger.info(`Detected shell type: ${shellType}`);
-
-          // Get the appropriate shell strategy
-          const shellStrategy = this.execToolCategory.shellContext.getStrategy(shellType);
-
-          // Get setup script and command prefix
-          const setupScript = shellStrategy.getSetupScript(startMarker, endMarker);
-          const commandPrefix = shellStrategy.getCommandPrefix();
-
-          // Send the actual setup script (will be hidden by read)
-          session.tab.sendInput(`${escapeShellString(setupScript)}\n`);
-
-          // Wait for command output
-          let output = '';
-          let commandStarted = false;
-          let commandFinished = false;
-
-          while (!commandFinished && !aborted) {
-            await new Promise(resolve => setTimeout(resolve, 100)); // Poll every 100ms
-
-            // Get terminal buffer
-            const textAfter = this.execToolCategory.getTerminalBufferText(session);
-
-            // Clean ANSI codes and process output
-            const cleanTextAfter = stripAnsi(textAfter);
-            const lines = cleanTextAfter.split('\n');
-
-            let promptIndex = -1;
-            // Find start and end markers
-            let startIndex = -1;
-            let endIndex = -1;
-
-            for (let i = lines.length - 1; i >= 0; i--) {
-              if (lines[i].startsWith(startMarker)) {
-                startIndex = i;
-                commandStarted = true;
-                for (let j = startIndex - 1; j >= 0; j--) {
-                  if (lines[j].includes(startMarker)) {
-                    promptIndex = j;
-                    break;
-                  }
-                }
-                for (let j = startIndex + 1; j < lines.length; j++) {
-                  if (lines[j].includes(endMarker)) {
-                    endIndex = j;
-                    commandFinished = true;
-                    break;
-                  }
-                }
-                break;
-              }
-            }
-
-            // Extract output between markers
-            if (commandStarted && commandFinished && startIndex !== -1 && endIndex !== -1) {
-              const commandOutput = lines.slice(startIndex + 1, endIndex)
-                .filter((line: string) => !line.includes(startMarker) && !line.includes(endMarker))
-                .join('\n')
-                .trim();
-
-              if (promptIndex !== -1) {
-                promptShell = lines[promptIndex].trim();
-              }
-              // Extract exit code if available
-              for (let i = endIndex; i < Math.min(endIndex + 5, lines.length); i++) {
-                if (lines[i].startsWith('exit_code:')) {
-                  exitCode = parseInt(lines[i].split(':')[1].trim(), 10);
-                  break;
-                }
-              }
-
-              output = commandOutput;
-              break;
-            }
-          }
-
-          // Clear active command for this session - handled in finally block now
-
-          if (aborted) {
-            this.logger.info(`Command was aborted, retrieving partial output`);
-
-            const textAfter = this.execToolCategory.getTerminalBufferText(session);
-            const cleanTextAfter = stripAnsi(textAfter);
-            const lines = cleanTextAfter.split('\n');
-
-            // Find start marker
-            let startIndex = -1;
-            for (let i = 0; i < lines.length; i++) {
-              if (lines[i].includes(startMarker)) {
-                startIndex = i;
-                break;
-              }
-            }
-
-            if (startIndex !== -1) {
-              // Get everything from start marker to end
-              output = lines.slice(startIndex + 1)
-                .filter((line: string) => !line.includes(startMarker))
-                .join('\n')
-                .trim();
-            } else {
-              // If no start marker found, return whole buffer
-              output = cleanTextAfter;
-            }
-
-            // Store the output in the storage service
-            const outputId = this.outputStorage.storeOutput({
-              command,
-              output,
-              promptShell,
-              exitCode,
-              timestamp: Date.now(),
-              aborted: true,
-              tabId: session.id
-            });
-
-            // Add to command history
-            const executionEndTime = Date.now();
-            this.commandHistoryManager.addCommand({
-              command,
-              output,
-              promptShell,
-              exitCode,
-              timestamp: executionStartTime,
-              aborted: true,
-              tabId: session.id.toString(),
-              tabTitle: session.tab.title,
-              duration: executionEndTime - executionStartTime
-            });
-
-            const outputLines = output.split('\n');
-            if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
-              output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
-            }
-
-            // Show result dialog if enabled
-            const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
-            if (showResultDialog) {
-              try {
-                // Show the result dialog using the dialog service
-                const result = await this.dialogService.showCommandResultDialog(
-                  command,
-                  output,
-                  exitCode,
-                  true // aborted
-                );
-
-                if (result) {
-                  if (result.accepted && result.userMessage) {
-                    // User accepted with a message
-                    return createJsonResponse({
-                      output: output,
-                      promptShell,
-                      exitCode,
-                      aborted: true,
-                      outputId,
-                      message: result.userMessage,
-                      userFeedback: {
-                        accepted: true,
-                        message: result.userMessage
-                      }
-                    });
-                  } else if (result.accepted === false && result.rejectionMessage) {
-                    // User rejected with a message
-                    return createJsonResponse({
-                      output: output,
-                      promptShell,
-                      exitCode,
-                      aborted: true,
-                      outputId,
-                      message: `Command rejected: ${result.rejectionMessage}`,
-                      userFeedback: {
-                        accepted: false,
-                        message: result.rejectionMessage
-                      }
-                    });
-                  }
-                }
-              } catch (error) {
-                this.logger.error('Error showing result dialog:', error);
-                // Continue with normal response if dialog fails
-              }
-            }
-
-            return createJsonResponse({
-              output: output,
-              promptShell,
-              exitCode,
-              aborted: true,
-              outputId,
-              message: outputLines.length > this.MAX_LINES_PER_RESPONSE
-              ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
-              : '',
-            });
-          }
-
-          this.logger.info(`Command executed: ${command}, tabIndex: ${session.id}, output length: ${output.length}`);
-
-          // Store the output in the storage service
-          const outputId = this.outputStorage.storeOutput({
-            command,
-            output,
-            promptShell,
-            exitCode,
-            timestamp: Date.now(),
-            aborted: false,
-            tabId: session.id
-          });
-
-          // Add to command history
-          const executionEndTime = Date.now();
-          this.commandHistoryManager.addCommand({
-            command,
-            output,
-            promptShell,
-            exitCode,
-            timestamp: executionStartTime,
-            aborted: false,
-            tabId: session.id.toString(),
-            tabTitle: session.tab.title,
-            duration: executionEndTime - executionStartTime
-          });
-
-          const outputLines = output.split('\n');
-          if (outputLines.length > this.MAX_LINES_PER_RESPONSE) {
-            output = outputLines.slice(0, this.MAX_LINES_PER_RESPONSE).join('\n') + '\n...';
-          }
-
-          // Show result dialog if enabled
-          const showResultDialog = pairProgrammingEnabled && this.config.store.mcp?.pairProgrammingMode?.showResultDialog !== false;
-          if (showResultDialog) {
-            try {
-              // Show the result dialog using the dialog service
-              const result = await this.dialogService.showCommandResultDialog(
-                command,
-                output,
-                exitCode,
-                false // not aborted
-              );
-
-              if (result) {
-                if (result.accepted && result.userMessage) {
-                  // User accepted with a message
-                  return createJsonResponse({
-                    output: output,
-                    promptShell,
-                    exitCode,
-                    aborted: false,
-                    outputId,
-                    message: result.userMessage,
-                    userFeedback: {
-                      accepted: true,
-                      message: result.userMessage
-                    }
-                  });
-                } else if (result.accepted === false && result.rejectionMessage) {
-                  // User rejected with a message
-                  return createJsonResponse({
-                    output: output,
-                    promptShell,
-                    exitCode,
-                    aborted: false,
-                    outputId,
-                    message: `Command rejected: ${result.rejectionMessage}`,
-                    userFeedback: {
-                      accepted: false,
-                      message: result.rejectionMessage
-                    }
-                  });
-                }
-              }
-            } catch (error) {
-              this.logger.error('Error showing result dialog:', error);
-              // Continue with normal response if dialog fails
-            }
-          }
-
-          return createJsonResponse({
-            output: output,
-            promptShell,
-            exitCode,
-            aborted: false,
-            outputId,
-            message: outputLines.length > this.MAX_LINES_PER_RESPONSE
-            ? `Output is too long (${outputLines.length} lines). Full output stored with ID: ${outputId}. Use get_command_output tool with this ID to retrieve the full output.`
-            : '',
-          });
         } catch (err) {
           this.logger.error(`Error executing command:`, err);
-          // Clear active command for this session
-          if (session) {
-            this.execToolCategory.clearActiveCommand(session.id);
-          }
           return createErrorResponse(`Failed to execute command: ${err.message || err}`);
-        } finally {
-          // Always clear active command when done (whether successful, aborted, or error)
-          if (session) {
-            this.execToolCategory.clearActiveCommand(session.id);
-            // Stop tracking the command in running commands manager
-            this.runningCommandsManager.endCommand(session.id.toString());
-          }
         }
       }
     };

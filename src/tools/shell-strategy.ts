@@ -170,17 +170,13 @@ export class ShellContext {
    * @param terminalOutput The terminal output containing shell type
    * @returns The detected shell type
    */
-  detectShellType(terminalOutput: string): string {
+  detectShellType(terminalOutput: string): string | null {
     const lines = stripAnsi(terminalOutput).split('\n');
-    for (let i = lines.length - 1; i >= 0; i--) {
-      const line = lines[i];
-      if (line.startsWith('SHELL_TYPE=')) {
-        // Trim any whitespace or special characters
-        const shellType = line.split('=')[1].trim();
-        console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
-        return shellType;
-      }
+    if (lines[lines.length - 1].startsWith('SHELL_TYPE=')) {
+      const shellType = lines[lines.length - 1].split('=')[1].trim();
+      console.log(`[DEBUG] Raw detected shell type: "${shellType}"`);
+      return shellType;
     }
-    return this.defaultStrategy.getShellType();
+    return null;
   }
 }

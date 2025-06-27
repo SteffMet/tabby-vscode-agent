@@ -1,0 +1,52 @@
+.modal-header
+  h5 Confirm Command Execution
+  .header-actions
+    button.btn.btn-sm.btn-outline-secondary.me-2((click)='minimize()', title='Minimize dialog')
+      i.fas.fa-window-minimize
+    button.btn-close((click)='cancel()')
+
+.modal-body
+  .alert.alert-info
+    i.fas.fa-info-circle.mr-2
+    span This command will be executed in the terminal.
+
+  .form-group
+    label Terminal
+    .form-control-plaintext {{tabTitle || 'Current terminal'}}
+
+  .form-group
+    label Command
+    pre.form-control.command-preview {{command}}
+
+  .form-group(*ngIf='commandExplanation')
+    label Command Explanation
+    .alert.alert-secondary
+      i.fas.fa-info-circle.mr-2
+      pre.command-explanation {{commandExplanation}}
+
+  .form-group(*ngIf='showRejectInput')
+    label Reason for Rejection
+    textarea.form-control(
+      #rejectMessageTextarea
+      [(ngModel)]='rejectMessage',
+      rows='3',
+      placeholder='Enter your reason for rejecting this command...',
+      (keydown)='onTextareaKeyDown($event)'
+    )
+
+.modal-footer
+  button.btn.btn-secondary((click)='minimize()')
+    span Minimize
+    small.text-muted (Click outside to close)
+
+  button.btn.btn-danger.mr-2(*ngIf='!showRejectInput', (click)='showRejectForm()')
+    span Reject
+    small.text-muted (R)
+
+  button.btn.btn-danger.mr-2(*ngIf='showRejectInput', (click)='reject()')
+    span Confirm Rejection
+    small.text-muted (Enter)
+
+  button.btn.btn-primary(*ngIf='!showRejectInput', (click)='confirm()')
+    span Execute
+    small.text-muted (Enter)

@@ -15,9 +15,18 @@ export class McpConfigProvider extends ConfigProvider {
       enabled: true,
       port: 3001,
       serverUrl: 'http://localhost:3001',
-      enableDebugLogging: true
+      enableDebugLogging: true,
+      pairProgrammingMode: {
+        enabled: false,
+        autoFocusTerminal: true,
+        showConfirmationDialog: true,
+        showResultDialog: true
+      }
     },
     hotkeys: {
+      'mcp-abort-command': [
+        'Ctrl-Shift-C',  // Sử dụng Ctrl-Shift-C để tránh conflict với Ctrl-C thông thường
+      ],
     },
   };
 

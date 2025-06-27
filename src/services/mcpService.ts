@@ -11,6 +11,7 @@ import { IncomingMessage, ServerResponse } from 'http';
 import { ConfigService } from 'tabby-core';
 import * as http from 'http';
 import { McpLoggerService } from './mcpLogger.service';
+import { log } from 'console';
 
 /**
  * The main MCP server service for Tabby
@@ -60,7 +61,7 @@ export class McpService {
         tool.schema as z.ZodRawShape, 
         tool.handler
       );
-      console.log(`Registered tool: ${tool.name} from category: ${category.name}`);
+      this.logger.info(`Registered tool: ${tool.name} from category: ${category.name} with schema: ${JSON.stringify(tool.schema)}`);
     });
   }
 
@@ -103,6 +104,34 @@ export class McpService {
       }
       this.logger.info(`Received message for sessionId ${sessionId}`);
       await this.transports[sessionId].handlePostMessage(req, res);
+    });
+  
+    // Configure API endpoints for tool access via HTTP
+    this.configureToolEndpoints();
+  }
+
+  /**
+   * Configure API endpoints for tool access via HTTP
+   */
+  private configureToolEndpoints(): void {
+    console.log('Configuring tool endpoints...');
+    // Add API endpoints for each tool for direct HTTP access
+    this.toolCategories.forEach(category => {
+      category.mcpTools.forEach(tool => {
+        console.log(`Configuring endpoint for tool: ${tool.name}`);
+        this.app.post(`/api/tool/${tool.name}`, express.json(), async (req: Request, res: Response) => {
+          try {
+            // Explicitly cast the body to any to match the handler's expected parameter type
+            const params: any = req.body;
+            this.logger.info(`Executing tool ${tool.name} with params: ${JSON.stringify(params)}`);  
+            const result = await tool.handler(params, {});
+            res.json(result);
+          } catch (error) {
+            this.logger.error(`Error executing tool ${tool.name}:`, error);
+            res.status(500).json({ error: error.message });
+          }
+        });
+      });
     });
   }
 

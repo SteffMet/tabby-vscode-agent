@@ -1,0 +1,69 @@
+.modal-header
+  h5 Command Execution Result
+  .header-actions
+    button.btn.btn-sm.btn-outline-secondary.me-2((click)='minimize()', title='Minimize dialog')
+      i.fas.fa-window-minimize
+    button.btn-close((click)='cancel()')
+
+.modal-body
+  .form-group
+    label Command
+    pre.form-control.command-preview {{command}}
+
+  .form-group
+    label Result
+    .alert.alert-success(*ngIf='exitCode === 0')
+      i.fas.fa-check-circle.mr-2
+      span Command completed successfully
+    .alert.alert-danger(*ngIf='exitCode !== 0 && exitCode !== null')
+      i.fas.fa-exclamation-circle.mr-2
+      span Command failed with exit code {{exitCode}}
+    .alert.alert-warning(*ngIf='aborted')
+      i.fas.fa-exclamation-triangle.mr-2
+      span Command execution was aborted
+
+  .form-group
+    label Output
+    textarea.form-control.output-preview(
+      #outputTextarea
+      readonly,
+      rows='10',
+      [ngModel]='output'
+    )
+
+  .form-group(*ngIf='originalInstruction')
+    label Original AI Instruction
+    pre.form-control.instruction-preview {{originalInstruction}}
+
+  .form-group
+    label(style='display: {{isRejectMode ? "none" : "block"}}') Your Message/Instructions
+    label.text-danger(style='display: {{!isRejectMode ? "none" : "block"}}') Reason for Rejection
+    textarea.form-control(
+      #messageTextarea
+      [(ngModel)]='userMessage',
+      rows='4',
+      placeholder='{{isRejectMode ? "Enter your reason for rejecting this command..." : "Enter your message or instructions here..."}}',
+      class='{{isRejectMode ? "border-danger" : ""}}',
+      (keydown)='onTextareaKeyDown($event)'
+    )
+
+.modal-footer
+  button.btn.btn-secondary((click)='minimize()')
+    span Minimize
+    small.text-muted (Click outside to close)
+
+  button.btn.btn-secondary((click)='cancel()')
+    span Cancel
+    small.text-muted (Esc)
+
+  button.btn.btn-outline-secondary.mr-2((click)='toggleRejectMode()', style='display: {{isRejectMode ? "inline-block" : "none"}}')
+    span Cancel Rejection
+
+  button.btn.btn-danger.mr-2((click)='reject()')
+    span(style='display: {{!isRejectMode ? "inline" : "none"}}') Reject
+    span(style='display: {{isRejectMode ? "inline" : "none"}}') Confirm Rejection
+    small.text-muted (R)
+
+  button.btn.btn-primary((click)='accept()')
+    span Accept
+    small.text-muted (Enter)

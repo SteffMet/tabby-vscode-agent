@@ -1,0 +1,100 @@
+// Command dialog styles
+.command-preview {
+  font-family: monospace;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+.command-explanation {
+  font-family: monospace;
+  margin: 0;
+  padding: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  background-color: transparent;
+  border: none;
+  color: inherit;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.output-preview {
+  font-family: monospace;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 300px;
+  overflow-y: auto;
+  resize: vertical;
+
+  // Styling for readonly textarea to look more like a text display
+  &[readonly] {
+    cursor: text;
+
+    // Remove focus outline for readonly textarea
+    &:focus {
+      outline: none;
+      box-shadow: none;
+      border-color: inherit;
+    }
+  }
+}
+
+.instruction-preview {
+  font-family: monospace;
+  background-color: #f5f5f5;
+  padding: 10px;
+  border-radius: 4px;
+  white-space: pre-wrap;
+  word-break: break-all;
+  max-height: 150px;
+  overflow-y: auto;
+}
+
+// Dialog focus styles
+.modal-content {
+  // Default state with subtle border
+  border: 2px solid rgba(0, 0, 0, 0.2) !important;
+  transition: border-color 0.2s ease-in-out, box-shadow 0.2s ease-in-out;
+  outline: none;
+
+  // Focused state with glowing border
+  &.focused {
+    border-color: #4fadff !important;
+    box-shadow: 0 0 8px rgba(79, 173, 255, 0.5) !important;
+  }
+}
+
+// Make modal backdrop darker and prevent clicks
+.modal-backdrop {
+  opacity: 0.7 !important;
+  pointer-events: all !important;
+}
+
+// Prevent interaction with elements behind the modal
+.modal {
+  pointer-events: all !important;
+}
+
+// Special class for modals that need to force focus
+.force-focus-modal {
+  .modal-dialog {
+    // Ensure the modal is always on top
+    z-index: 1100 !important;
+  }
+
+  // Prevent any interaction with elements outside the modal
+  ~ .modal-backdrop {
+    opacity: 0.8 !important;
+    pointer-events: all !important;
+  }
+}

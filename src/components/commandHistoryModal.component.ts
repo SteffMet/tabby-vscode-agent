@@ -155,7 +155,84 @@ import { CommandHistoryManagerService, CommandHistoryEntry } from '../services/c
           Showing {{filteredHistory.length}} of {{totalHistory}} commands
         </small>
       </div>
-      <button class="btn btn-outline-danger" (click)="clearAllHistory()">
+      
+      <!-- Export Dropdown -->
+      <div class="dropdown me-2" ngbDropdown>
+        <button class="btn btn-outline-success dropdown-toggle" type="button" ngbDropdownToggle>
+          <i class="fas fa-download me-1"></i>
+          Export History
+        </button>
+        <div class="dropdown-menu" ngbDropdownMenu>
+          <h6 class="dropdown-header">
+            <i class="fas fa-file-export me-1"></i>
+            Export Current View ({{filteredHistory.length}} commands)
+          </h6>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportCommandsOnly(false)">
+            <i class="fas fa-terminal me-2"></i>
+            Commands Only (TXT)
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportCommandsWithOutput(false)">
+            <i class="fas fa-file-alt me-2"></i>
+            Commands with Output (TXT)
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportAsJSON(false)">
+            <i class="fas fa-code me-2"></i>
+            Export as JSON
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportAsCSV(false)">
+            <i class="fas fa-table me-2"></i>
+            Export as CSV
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportAsMarkdown(false)">
+            <i class="fab fa-markdown me-2"></i>
+            Export as Markdown
+          </button>
+          <div class="dropdown-divider"></div>
+          <h6 class="dropdown-header">
+            <i class="fas fa-clipboard me-1"></i>
+            Copy to Clipboard
+          </h6>
+          <button class="dropdown-item" ngbDropdownItem (click)="copyCommandsOnly()">
+            <i class="fas fa-copy me-2"></i>
+            Copy Commands Only
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="copyCommandsWithOutput()">
+            <i class="fas fa-clipboard me-2"></i>
+            Copy with Output
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="copyAsJSON()">
+            <i class="fas fa-code me-2"></i>
+            Copy as JSON
+          </button>
+          <div class="dropdown-divider"></div>
+          <h6 class="dropdown-header">
+            <i class="fas fa-history me-1"></i>
+            Export All History ({{totalHistory}} commands)
+          </h6>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportCommandsOnly(true)">
+            <i class="fas fa-terminal me-2"></i>
+            All Commands Only (TXT)
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportCommandsWithOutput(true)">
+            <i class="fas fa-file-alt me-2"></i>
+            All Commands with Output (TXT)
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportAsJSON(true)">
+            <i class="fas fa-code me-2"></i>
+            All History as JSON
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportAsCSV(true)">
+            <i class="fas fa-table me-2"></i>
+            All History as CSV
+          </button>
+          <button class="dropdown-item" ngbDropdownItem (click)="exportAsMarkdown(true)">
+            <i class="fab fa-markdown me-2"></i>
+            All History as Markdown
+          </button>
+        </div>
+      </div>
+      
+      <button class="btn btn-outline-danger me-2" (click)="clearAllHistory()">
         <i class="fas fa-trash me-1"></i>
         Clear All History
       </button>
@@ -354,6 +431,68 @@ import { CommandHistoryManagerService, CommandHistoryEntry } from '../services/c
     .output-text::-webkit-scrollbar-thumb:hover {
       background: #888;
     }
+
+    /* Export dropdown styling */
+    .dropdown-menu {
+      border: 2px solid #dee2e6;
+      box-shadow: 0 4px 8px rgba(0,0,0,0.15);
+      border-radius: 0.5rem;
+      min-width: 320px;
+      max-height: 70vh;
+      overflow-y: auto;
+    }
+
+    .dropdown-header {
+      font-weight: 600;
+      color: #495057;
+      font-size: 0.85rem;
+      padding: 0.5rem 1rem;
+      margin-bottom: 0.25rem;
+      background-color: #f8f9fa;
+      border-radius: 0.25rem;
+    }
+
+    .dropdown-item {
+      font-weight: 500;
+      padding: 0.5rem 1rem;
+      color: #495057;
+    }
+
+    .dropdown-item:hover {
+      background-color: #e9ecef;
+      color: #212529;
+    }
+
+    .dropdown-item i {
+      width: 18px;
+      text-align: center;
+    }
+
+    .btn-outline-success {
+      border-width: 2px;
+      font-weight: 600;
+    }
+
+    .btn-outline-success:hover {
+      background-color: #28a745;
+      border-color: #28a745;
+    }
+
+    /* Responsive adjustments */
+    @media (max-width: 768px) {
+      .modal-footer {
+        flex-direction: column;
+        gap: 0.5rem;
+      }
+      
+      .modal-footer .dropdown {
+        width: 100%;
+      }
+      
+      .modal-footer .dropdown .btn {
+        width: 100%;
+      }
+    }
   `]
 })
 export class CommandHistoryModalComponent implements OnInit, OnDestroy {
@@ -551,5 +690,209 @@ export class CommandHistoryModalComponent implements OnInit, OnDestroy {
 
   trackByEntryId(index: number, entry: CommandHistoryEntry): string {
     return entry.id;
+  }
+
+  /**
+   * Export commands only (download as file)
+   */
+  async exportCommandsOnly(exportAll: boolean): Promise<void> {
+    try {
+      const entries = exportAll ? this.historyManager.history : this.filteredHistory;
+      const content = this.historyManager.exportCommandsOnly(entries);
+      
+      if (!content) {
+        alert('No commands to export');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const scope = exportAll ? 'all' : 'filtered';
+             const filename = `command-history-commands-${scope}-${timestamp}.json`;
+      
+             const success = await this.historyManager.downloadExport(content, filename, 'application/json;charset=utf-8');
+       if (success) {
+         console.log(`Exported ${entries.length} commands to JSON file: ${filename}`);
+       }
+    } catch (error) {
+      console.error('Error exporting commands only:', error);
+      alert('Failed to export commands. Please try again.');
+    }
+  }
+
+  /**
+   * Export commands with output (download as file)
+   */
+  async exportCommandsWithOutput(exportAll: boolean): Promise<void> {
+    try {
+      const entries = exportAll ? this.historyManager.history : this.filteredHistory;
+      const content = this.historyManager.exportCommandsWithOutput(entries);
+      
+      if (!content) {
+        alert('No commands to export');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const scope = exportAll ? 'all' : 'filtered';
+      const filename = `command-history-full-${scope}-${timestamp}.txt`;
+      
+      const success = await this.historyManager.downloadExport(content, filename);
+      if (success) {
+        console.log(`Exported ${entries.length} commands with output to file: ${filename}`);
+      }
+    } catch (error) {
+      console.error('Error exporting commands with output:', error);
+      alert('Failed to export commands with output. Please try again.');
+    }
+  }
+
+  /**
+   * Copy commands only to clipboard
+   */
+  async copyCommandsOnly(): Promise<void> {
+    try {
+      const content = this.historyManager.exportCommandsOnly(this.filteredHistory);
+      
+      if (!content) {
+        alert('No commands to copy');
+        return;
+      }
+
+      const success = await this.historyManager.copyExportToClipboard(content);
+      if (success) {
+        console.log(`Copied ${this.filteredHistory.length} commands to clipboard`);
+        // Could show a toast notification here
+      }
+    } catch (error) {
+      console.error('Error copying commands only:', error);
+      alert('Failed to copy commands. Please try again.');
+    }
+  }
+
+  /**
+   * Copy commands with output to clipboard
+   */
+  async copyCommandsWithOutput(): Promise<void> {
+    try {
+      const content = this.historyManager.exportCommandsWithOutput(this.filteredHistory);
+      
+      if (!content) {
+        alert('No commands to copy');
+        return;
+      }
+
+      const success = await this.historyManager.copyExportToClipboard(content);
+      if (success) {
+        console.log(`Copied ${this.filteredHistory.length} commands with output to clipboard`);
+        // Could show a toast notification here
+      }
+    } catch (error) {
+      console.error('Error copying commands with output:', error);
+      alert('Failed to copy commands with output. Please try again.');
+    }
+  }
+
+  /**
+   * Export as JSON
+   */
+  async exportAsJSON(exportAll: boolean): Promise<void> {
+    try {
+      const entries = exportAll ? this.historyManager.history : this.filteredHistory;
+      const content = this.historyManager.exportAsJSON(entries);
+      
+      if (!content) {
+        alert('No commands to export');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const scope = exportAll ? 'all' : 'filtered';
+      const filename = `command-history-commands-${scope}-${timestamp}.json`;
+      
+      const success = await this.historyManager.downloadExport(content, filename);
+      if (success) {
+        console.log(`Exported ${entries.length} commands to file: ${filename}`);
+      }
+    } catch (error) {
+      console.error('Error exporting commands as JSON:', error);
+      alert('Failed to export commands as JSON. Please try again.');
+    }
+  }
+
+  /**
+   * Export as CSV
+   */
+  async exportAsCSV(exportAll: boolean): Promise<void> {
+    try {
+      const entries = exportAll ? this.historyManager.history : this.filteredHistory;
+      const content = this.historyManager.exportAsCSV(entries);
+      
+      if (!content) {
+        alert('No commands to export');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const scope = exportAll ? 'all' : 'filtered';
+             const filename = `command-history-commands-${scope}-${timestamp}.csv`;
+       
+       const success = await this.historyManager.downloadExport(content, filename, 'text/csv;charset=utf-8');
+       if (success) {
+         console.log(`Exported ${entries.length} commands to CSV file: ${filename}`);
+       }
+    } catch (error) {
+      console.error('Error exporting commands as CSV:', error);
+      alert('Failed to export commands as CSV. Please try again.');
+    }
+  }
+
+  /**
+   * Export as Markdown
+   */
+  async exportAsMarkdown(exportAll: boolean): Promise<void> {
+    try {
+      const entries = exportAll ? this.historyManager.history : this.filteredHistory;
+      const content = this.historyManager.exportAsMarkdown(entries);
+      
+      if (!content) {
+        alert('No commands to export');
+        return;
+      }
+
+      const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, -5);
+      const scope = exportAll ? 'all' : 'filtered';
+             const filename = `command-history-commands-${scope}-${timestamp}.md`;
+       
+       const success = await this.historyManager.downloadExport(content, filename, 'text/markdown;charset=utf-8');
+       if (success) {
+         console.log(`Exported ${entries.length} commands to Markdown file: ${filename}`);
+       }
+    } catch (error) {
+      console.error('Error exporting commands as Markdown:', error);
+      alert('Failed to export commands as Markdown. Please try again.');
+    }
+  }
+
+  /**
+   * Copy as JSON
+   */
+  async copyAsJSON(): Promise<void> {
+    try {
+      const content = this.historyManager.exportAsJSON(this.filteredHistory);
+      
+      if (!content) {
+        alert('No commands to copy');
+        return;
+      }
+
+      const success = await this.historyManager.copyExportToClipboard(content);
+      if (success) {
+        console.log(`Copied ${this.filteredHistory.length} commands as JSON to clipboard`);
+        // Could show a toast notification here
+      }
+    } catch (error) {
+      console.error('Error copying commands as JSON:', error);
+      alert('Failed to copy commands as JSON. Please try again.');
+    }
   }
 } 

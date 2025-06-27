@@ -614,7 +614,6 @@ RETURNS:
 
 RELATED TOOLS:
 - get_ssh_session_list: Find available terminal sessions
-- abort_command: Stop a running command
 - get_command_output: Retrieve full output for truncated responses
 
 EXAMPLE USAGE:

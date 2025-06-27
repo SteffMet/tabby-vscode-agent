@@ -21,10 +21,10 @@
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
+    "@xterm/addon-serialize": "^0.12.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
-    "zod": "^3.22.4",
-    "@xterm/addon-serialize": "^0.12.0"
+    "zod": "^3.22.4"
   },
   "peerDependencies": {
     "@angular/animations": "*",
@@ -34,7 +34,10 @@
     "@ng-bootstrap/ng-bootstrap": "*",
     "rxjs": "*",
     "tabby-core": "*",
-    "tabby-terminal": "*",
-    "tabby-settings": "*"
+    "tabby-settings": "*",
+    "tabby-terminal": "*"
+  },
+  "devDependencies": {
+    "strip-ansi": "^7.1.0"
   }
 }

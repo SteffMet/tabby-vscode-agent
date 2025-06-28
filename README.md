@@ -102,10 +102,6 @@ STDIO mode:
 {
   "mcpServers": {
     "Tabby MCP": {
-      "type": "sse",
-      "url": "http://localhost:3001/sse"
-    },
-    "Tabby MCP STDIO": {
       "command": "npx",
       "args": [
         "-y",

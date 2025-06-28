@@ -27,5 +27,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - SSH session management tools
 - Terminal buffer access functionality
 - Command execution and abortion tools
-- Configuration options for MCP server
-- Documentation and examples
+- Configuration options for MCP servers

@@ -11,13 +11,15 @@ WORKDIR /tabby
 COPY --from=git-clone /app .
 
 # Install required dependencies for native modules
-RUN apt-get update && apt-get install -y libfontconfig1-dev git python3 build-essential && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y \
+    libfontconfig1-dev \
+    git \
+    python3 \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
 
 # Install project dependencies
-RUN cd app && \
-    yarn && \
-    cd .. && \
-    yarn
+RUN cd app && yarn && cd .. && yarn
 
 # Build typings and full application
 RUN yarn run build:typings
@@ -25,47 +27,47 @@ RUN yarn run build:typings
 # === Stage 3: Build tabby-mcp ===
 FROM node:22-slim AS builder-mcp
 
-WORKDIR /tabby
+# Create working directory
+WORKDIR /tabby-mcp
 
-COPY --from=builder-tabby /tabby .
+# Copy only necessary tabby dependencies (thay vì copy toàn bộ /tabby)
+COPY --from=builder-tabby /tabby/tabby-core ./temp-tabby/tabby-core
+COPY --from=builder-tabby /tabby/tabby-settings ./temp-tabby/tabby-settings
+COPY --from=builder-tabby /tabby/tabby-terminal ./temp-tabby/tabby-terminal
 
-WORKDIR /tabby/tabby-mcp
+# Copy package files first for better Docker layer caching
 COPY package*.json ./
+
+# Install dependencies
 RUN npm ci --legacy-peer-deps
 
+# Copy source code
 COPY . .
+
+# Build the project
 RUN npm run build
+
 # === Stage 4: Production image ===
 FROM node:22-slim AS production
 
-WORKDIR /tabby/tabby-mcp
+WORKDIR /tabby-mcp
 
-# Copy only built artifacts
-COPY --from=builder-mcp /tabby/tabby-mcp/dist ./dist
+# Copy built dist folder
+COPY --from=builder-mcp /tabby-mcp/dist ./dist
 
-# Copy node_modules from both stages
-COPY --from=builder-tabby /tabby/node_modules ./node_modules
-COPY --from=builder-mcp /tabby/tabby-mcp/node_modules ./node_modules
+# Copy base node_modules
+COPY --from=builder-mcp /tabby-mcp/node_modules ./node_modules
 
-RUN rm node_modules/tabby-core && \
-    rm node_modules/tabby-settings && \
-    rm -rf node_modules/tabby-terminal
+# Copy tabby dependencies to correct locations
+COPY --from=builder-mcp /tabby-mcp/temp-tabby/tabby-core ./node_modules/tabby-core
+COPY --from=builder-mcp /tabby-mcp/temp-tabby/tabby-settings ./node_modules/tabby-settings
+COPY --from=builder-mcp /tabby-mcp/temp-tabby/tabby-terminal ./node_modules/tabby-terminal
 
-# Hack
-RUN mkdir -p node_modules/tabby-core && \
-    mkdir -p node_modules/tabby-settings && \
-    mkdir -p node_modules/tabby-terminal
-
-COPY --from=builder-tabby /tabby/tabby-core ./node_modules/tabby-core
-COPY --from=builder-tabby /tabby/tabby-settings ./node_modules/tabby-settings
-COPY --from=builder-tabby /tabby/tabby-terminal ./node_modules/tabby-terminal
-
-# Copy README, package.json, and LICENSE
+# Copy metadata files
 COPY README.md package.json LICENSE ./
 
-# Create volumes for output and node_modules
-VOLUME ["/output"]
-VOLUME ["/node_modules_export"]
+# Create volumes for output
+VOLUME ["/output", "/node_modules_export"]
 
-# Copy dist contents and node_modules to the output volumes when container starts
+# Copy files to volumes when container starts
 CMD ["sh", "-c", "cp -r ./dist/ README.md package.json LICENSE /output/ && cp -rf ./node_modules/* /node_modules_export/"]

@@ -40,7 +40,7 @@ Watch the full video demonstration of Tabby-MCP in action:
   - [💻 Usage Examples](#-usage-examples)
     - [Connect an AI to Control Your Terminal](#connect-an-ai-to-control-your-terminal)
   - [🔗 Connecting to MCP](#-connecting-to-mcp)
-  - [⚙️ Configuration](#️-configuration)
+  - [⚙️ Configuration in Tabby Setting](#️-configuration-in-tabby-setting)
     - [Pair Programming Mode](#pair-programming-mode)
   - [📚 API Reference](#-api-reference)
     - [Available Tools](#available-tools)
@@ -128,7 +128,7 @@ SSE mode:
 
 Select your preferred MCP server in your AI client settings. The Tabby MCP plugin must be running for the "Tabby MCP" (SSE) option to work, while the STDIO and Docker options will start their own server instances.
 
-## ⚙️ Configuration
+## ⚙️ Configuration in Tabby Setting
 
 Configure the MCP server through the Tabby settings:
 

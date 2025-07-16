@@ -1,131 +1,131 @@
 .content
-  .form-line
-    .header
-      .title MCP Settings
-      .description Configure settings for the MCP (Model Control Protocol) integration
+  .settings-header
+    h1.tabby-header
+      i.bi.bi-gear-wide-connected.mr-2
+      | Copilot VSCode Agent
+    .github-profile-link
+      a(href='https://github.com/steffmet', target='_blank', rel='noopener', title='Visit SteffMet on GitHub')
+        button.btn.btn-secondary.github-btn
+          i.fab.fa-github.mr-1
+          span View GitHub
 
-  .form-group
-    label Server URL
-    .d-flex
-      input.form-control.mr-2(
-        type='text',
-        [(ngModel)]='serverUrl',
-      )
-      button.btn.btn-secondary(
-        (click)='saveServerUrl()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted The URL of the MCP server to connect to
+  .settings-columns
+    .settings-left
+      .header
+        .title
+          i.bi.bi-gear-wide-connected.mr-2
+          | Copilot VSCode Agent
+        .description Configure settings for the Copilot integration
+      //- Copilot Settings Section
+      .form-group
+        button.btn.btn-secondary((click)='toggleInstructions()')
+          i.fas.fa-info-circle.mr-1
+          span {{ instructionsVisible ? 'Hide' : 'Show' }} Instructions
+        .card.instructions-card(*ngIf='instructionsVisible')
+          .card-body
+            h5.card-title How to Integrate with VS Code
+            p To connect Tabby with VS Code, you need to configure the MCP server in your VS Code settings. Open your <code>settings.json</code> and add one of the following configurations:
+            p If you have issues with <code>npx</code>, install tabby-mcp-stdio globally:
+              code npm install -g tabby-mcp-stdio
+            .mcp-config-options
+              .mcp-config-option
+                h6 HTTP/SSE MCP
+                .d-flex.align-items-center
+                  pre.mcp-config-snippet
+                    code([innerText]='vscodeSettingsJson')
+                  button.btn.btn-sm.btn-outline-secondary.ml-2((click)='copyConfigJson("http")', title='Copy HTTP/SSE MCP config')
+                    i.fas.fa-copy
+                    span.ml-1 Copy
+              .mcp-config-option.mt-3
+                h6 STDIO MCP
+                .d-flex.align-items-center
+                  pre.mcp-config-snippet
+                    code([innerText]='stdioSettingsJson')
+                  button.btn.btn-sm.btn-outline-secondary.ml-2((click)='copyConfigJson("stdio")', title='Copy STDIO MCP config')
+                    i.fas.fa-copy
+                    span.ml-1 Copy
+            p This will allow Tabby to send commands to VS Code, enabling features like opening the chat window directly from the toolbar
+      .form-group
+        label Server URL
+        .d-flex
+          input.form-control.mr-2(type='text', [(ngModel)]='serverUrl')
+          button.btn.btn-secondary((click)='saveServerUrl()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted The URL of the MCP server to connect to
+      .form-group
+        label Port
+        .d-flex
+          input.form-control.mr-2(type='number', [(ngModel)]='port')
+          button.btn.btn-secondary((click)='savePort()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted The port number for the MCP server
+      .form-group
+        label Start on Boot
+        .d-flex
+          toggle([(ngModel)]='startOnBoot')
+          button.btn.btn-secondary.ml-2((click)='toggleStartOnBoot()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted Automatically start the MCP server when Tabby starts
+      .form-group
+        label Server Control
+        .d-flex
+          button.btn.btn-primary.mr-2(*ngIf='!isServerRunning', (click)='startServer()')
+            i.fas.fa-play.mr-2
+            span Start Server
+          button.btn.btn-danger(*ngIf='isServerRunning', (click)='stopServer()')
+            i.fas.fa-stop.mr-2
+            span Stop Server
+        .text-muted.mt-2(*ngIf='isServerRunning') Server is currently running
+        .text-muted.mt-2(*ngIf='!isServerRunning') Server is currently stopped
+      .form-group
+        label Debug Logging
+        .d-flex
+          toggle([(ngModel)]='enableDebugLogging')
+          button.btn.btn-secondary.ml-2((click)='toggleDebugLogging()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted Enable detailed logging for MCP operations
 
-  .form-group
-    label Port
-    .d-flex
-      input.form-control.mr-2(
-        type='number',
-        [(ngModel)]='port',
-      )
-      button.btn.btn-secondary(
-        (click)='savePort()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted The port number for the MCP server
+    .settings-right
+      .header
+        .title Pair Programming Mode
+        .description Manage collaborative AI features
+      //- Pair Programming Mode Section
+      .form-group
+        label Enable Pair Programming Mode
+        .d-flex
+          toggle([(ngModel)]='pairProgrammingEnabled')
+          button.btn.btn-secondary.ml-2((click)='togglePairProgrammingMode()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted Enable collaborative features for pair programming with AI
+      .form-group(*ngIf='pairProgrammingEnabled')
+        label Auto Focus Terminal
+        .d-flex
+          toggle([(ngModel)]='autoFocusTerminal')
+          button.btn.btn-secondary.ml-2((click)='toggleAutoFocusTerminal()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted Automatically focus the terminal window when executing commands
+      .form-group(*ngIf='pairProgrammingEnabled')
+        label Show Confirmation Dialog
+        .d-flex
+          toggle([(ngModel)]='showConfirmationDialog')
+          button.btn.btn-secondary.ml-2((click)='toggleShowConfirmationDialog()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted Show a confirmation dialog before executing commands
+      .form-group(*ngIf='pairProgrammingEnabled')
+        label Show Result Dialog
+        .d-flex
+          toggle([(ngModel)]='showResultDialog')
+          button.btn.btn-secondary.ml-2((click)='toggleShowResultDialog()')
+            i.fas.fa-save.mr-1
+            span Save
+        .text-muted Show a dialog with command results after execution
 
-  .form-group
-    label Start on Boot
-    .d-flex
-      toggle(
-        [(ngModel)]='startOnBoot',
-      )
-      button.btn.btn-secondary.ml-2(
-        (click)='toggleStartOnBoot()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted Automatically start the MCP server when Tabby starts
-
-  .form-group
-    label Server Control
-    .d-flex
-      button.btn.btn-primary.mr-2(
-        *ngIf='!isServerRunning',
-        (click)='startServer()',
-      )
-        i.fas.fa-play.mr-2
-        span Start Server
-      button.btn.btn-danger(
-        *ngIf='isServerRunning',
-        (click)='stopServer()',
-      )
-        i.fas.fa-stop.mr-2
-        span Stop Server
-    .text-muted.mt-2(*ngIf='isServerRunning') Server is currently running
-    .text-muted.mt-2(*ngIf='!isServerRunning') Server is currently stopped
-
-  .form-group
-    label Debug Logging
-    .d-flex
-      toggle(
-        [(ngModel)]='enableDebugLogging',
-      )
-      button.btn.btn-secondary.ml-2(
-        (click)='toggleDebugLogging()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted Enable detailed logging for MCP operations
-
-  h3.mt-4 Pair Programming Mode
-
-  .form-group
-    label Enable Pair Programming Mode
-    .d-flex
-      toggle(
-        [(ngModel)]='pairProgrammingEnabled',
-      )
-      button.btn.btn-secondary.ml-2(
-        (click)='togglePairProgrammingMode()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted Enable collaborative features for pair programming with AI
-
-  .form-group(*ngIf='pairProgrammingEnabled')
-    label Auto Focus Terminal
-    .d-flex
-      toggle(
-        [(ngModel)]='autoFocusTerminal',
-      )
-      button.btn.btn-secondary.ml-2(
-        (click)='toggleAutoFocusTerminal()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted Automatically focus the terminal window when executing commands
-
-  .form-group(*ngIf='pairProgrammingEnabled')
-    label Show Confirmation Dialog
-    .d-flex
-      toggle(
-        [(ngModel)]='showConfirmationDialog',
-      )
-      button.btn.btn-secondary.ml-2(
-        (click)='toggleShowConfirmationDialog()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted Show a confirmation dialog before executing commands
-
-  .form-group(*ngIf='pairProgrammingEnabled')
-    label Show Result Dialog
-    .d-flex
-      toggle(
-        [(ngModel)]='showResultDialog',
-      )
-      button.btn.btn-secondary.ml-2(
-        (click)='toggleShowResultDialog()',
-      )
-        i.fas.fa-save.mr-1
-        span Save
-    .text-muted Show a dialog with command results after execution
+  .github-link
+    a(href='https://github.com/SteffMet', target='_blank') Created by SteffMet

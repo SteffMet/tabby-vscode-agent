@@ -1,29 +1,35 @@
 {
-  "name": "tabby-mcp",
-  "version": "0.0.2",
-  "description": "Model Context Protocol implementation for Tabby",
-  "homepage": "https://github.com/thuanpham582002/tabby-mcp-server",
+  "name": "tabby-vscode-agent",
+  "version": "1.0.6",
+  "description": "Copilot Intergration for Tabby",
+  "homepage": "https://github.com/SteffMet/tabby-vscode-agent",
   "keywords": [
     "tabby-plugin",
+    "tabby-vscode",
+    "copilot",
     "mcp"
   ],
-  "main": "dist/index.js",
+  "main": "plugins/dist/index.js",
   "typings": "typings/index.d.ts",
   "scripts": {
     "build": "webpack --progress --color",
-    "watch": "webpack --progress --color --watch"
+    "watch": "webpack --progress --color --watch",
+    "clean": "rimraf build dist plugins",
+    "deploy": "npm run build && node scripts/deploy.js",
+    "prepublishOnly": "npm run build && node scripts/prepare-publish.js"
   },
   "files": [
-    "dist",
+    "plugins",
     "typings"
   ],
-  "author": "Pham Tien Thuan",
+  "author": "Steff",
   "license": "MIT",
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.8.0",
     "@xterm/addon-serialize": "^0.12.0",
     "cors": "^2.8.5",
     "express": "^4.18.2",
+    "tabby-mcp-stdio": "^1.0.4",
     "zod": "^3.22.4"
   },
   "peerDependencies": {
@@ -38,6 +44,28 @@
     "tabby-terminal": "*"
   },
   "devDependencies": {
-    "strip-ansi": "^7.1.0"
+    "@angular/animations": "~15.2.10",
+    "@angular/common": "~15.2.10",
+    "@angular/core": "~15.2.10",
+    "@angular/forms": "~15.2.10",
+    "@ng-bootstrap/ng-bootstrap": "~14.2.0",
+    "angular2-template-loader": "^0.6.2",
+    "css-loader": "^7.1.2",
+    "pug": "^3.0.3",
+    "pug-plain-loader": "^1.1.0",
+    "raw-loader": "^4.0.2",
+    "rimraf": "^6.0.1",
+    "rxjs": "*",
+    "sass": "^1.89.2",
+    "sass-loader": "^16.0.5",
+    "strip-ansi": "^7.1.0",
+    "tabby-core": "*",
+    "tabby-settings": "*",
+    "tabby-terminal": "*",
+    "to-string-loader": "^1.2.0",
+    "ts-loader": "^9.5.2",
+    "typescript": "~4.9.5",
+    "webpack": "^5.100.1",
+    "webpack-cli": "^6.0.1"
   }
 }

@@ -1,10 +1,11 @@
 import { Injectable } from '@angular/core';
-import { HotkeysService } from 'tabby-core';
+import { AppService, HotkeysService } from 'tabby-core';
 import { NgbModal } from '@ng-bootstrap/ng-bootstrap';
 import { ExecToolCategory } from '../tools/terminal';
 import { McpLoggerService } from './mcpLogger.service';
 import { CommandHistoryModalComponent } from '../components/commandHistoryModal.component';
 import { RunningCommandsDialogComponent } from '../components/runningCommandsDialog.component';
+import { exec } from 'child_process';
 
 /**
  * Service for handling MCP-related hotkeys
@@ -16,6 +17,7 @@ export class McpHotkeyService {
     private execToolCategory: ExecToolCategory,
     private logger: McpLoggerService,
     private modal: NgbModal,
+    private app: AppService,
   ) {
     this.logger.info('McpHotkeyService initialized');
     this.initializeHotkeys();
@@ -30,6 +32,8 @@ export class McpHotkeyService {
         this.showCommandHistory();
       } else if (hotkey === 'mcp-show-running-commands') {
         this.showRunningCommands();
+      } else if (hotkey === 'mcp-open-copilot') {
+        this.openCopilot();
       }
     });
   }
@@ -97,6 +101,24 @@ export class McpHotkeyService {
       });
     } catch (error) {
       this.logger.error('Error showing running commands:', error);
+    }
+  }
+
+  /**
+   * Open Copilot window
+   */
+  public openCopilot(): void {
+    try {
+      this.logger.info('Opening Copilot window via hotkey');
+      exec('pwsh.exe -Command "code --command workbench.action.chat.openInNewWindow"', (error, stdout, stderr) => {
+        if (error) {
+          this.logger.error('Error running VS Code Copilot command:', error);
+        } else {
+          this.logger.info('VS Code Copilot command executed:', stdout);
+        }
+      });
+    } catch (error) {
+      this.logger.error('Error opening Copilot window:', error);
     }
   }
 }

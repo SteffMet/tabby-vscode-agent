@@ -1,166 +1,117 @@
-# 🚀 Tabby-MCP-Server
+# 🚀 Tabby VSCode Agent
 
-[![npm version](https://img.shields.io/npm/v/tabby-mcp.svg)](https://www.npmjs.com/package/tabby-mcp)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![GitHub issues](https://img.shields.io/github/issues/thuanpham582002/tabby-mcp-server.svg)](https://github.com/thuanpham582002/tabby-mcp-server/issues)
-[![GitHub stars](https://img.shields.io/github/stars/thuanpham582002/tabby-mcp-server.svg)](https://github.com/thuanpham582002/tabby-mcp-server/stargazers)
+> The Tabby VSCode Agent is an advanced plugin for [Tabby Terminal](https://github.com/Eugeny/tabby), designed to seamlessly integrate AI-powered terminal control and automation directly within VS Code. Building upon the foundations of the original [Tabby MCP Server](https://github.com/thuanpham582002/tabby-mcp-server), this improved version offers enhanced functionality, quicker speeds, and a more refined user experience tailored for VS Code users.
 
-> Powerful Tabby plugin that implements Model Context Protocol (MCP) server, enabling AI-powered terminal control and automation.
-> 
-> Plugin for [Tabby Terminal](https://github.com/Eugeny/tabby) - a modern, highly configurable terminal emulator.
+## 📹 Video Demonstrations
 
-## 📹 Video Demo
+Witness the Tabby VSCode Agent in action with these comprehensive video demonstrations:
 
-Watch the full video demonstration of Tabby-MCP in action:
+### VSCode Agent in Action
+[![Tabby VSCode Agent Demo](assets/gifs/vscodeagent.gif)](assets/gifs/vscodeagent.gif)
 
-[![Tabby MCP Plugin - AI Terminal Integration Demo](https://img.youtube.com/vi/uFWBGiD4x9c/0.jpg)](https://youtu.be/uFWBGiD4x9c)
+### Tabby Settings Overview
+[![Tabby Settings Demo](assets/gifs/tabbysettings.gif)](assets/gifs/tabbysettings.gif)
 
-## ✨ Features
+## ✨ Key Features
 
-- 🤖 **AI Connection**: Seamlessly connect AI assistants to your terminal
-- 🔌 **MCP Server**: Built-in Model Context Protocol server implementation
-- 🖥️ **Terminal Control**: Allow AI to execute commands and read terminal output
-- 🔍 **Session Management**: View and manage SSH sessions
-- 🚫 **Command Abort**: Safely abort running commands
-- 📋 **Buffer Access**: Retrieve terminal buffer content with flexible options
-- 🔒 **Pair Programming Mode**: Optional confirmation dialog before command execution
-- 📊 **Command History**: Track and review previously executed commands
-- 🔄 **Command Output Storage**: Paginated access to complete command outputs
-
-## 📋 Table of Contents
-
-- [🚀 Tabby-MCP-Server](#-tabby-mcp-server)
-  - [📹 Video Demo](#-video-demo)
-  - [✨ Features](#-features)
-  - [📋 Table of Contents](#-table-of-contents)
-  - [🔧 Installation](#-installation)
-    - [Install from Tabby Plugin Store](#install-from-tabby-plugin-store)
-    - [Using Docker](#using-docker)
-  - [🚀 Quick Start](#-quick-start)
-  - [💻 Usage Examples](#-usage-examples)
-    - [Connect an AI to Control Your Terminal](#connect-an-ai-to-control-your-terminal)
-  - [🔗 Connecting to MCP](#-connecting-to-mcp)
-  - [⚙️ Configuration in Tabby Setting](#️-configuration-in-tabby-setting)
-    - [Pair Programming Mode](#pair-programming-mode)
-  - [📚 API Reference](#-api-reference)
-    - [Available Tools](#available-tools)
-  - [🤝 Contributing](#-contributing)
-    - [Development Workflow](#development-workflow)
-  - [📝 License](#-license)
+- 🤖 **AI Integration**: Effortlessly connect AI assistants to your terminal for intelligent command execution and automation.
+- 🔌 **Built-in MCP Server**: Features a robust Model Context Protocol (MCP) server implementation for reliable communication.
+- 🚀 **Deep VS Code Integration**:
+    - **Open Chat from Navbar**: Instantly open the Copilot chat window directly from the Tabby navigation bar within VS Code.
+    - **Optimised Settings & Logins**: Enjoy a redesigned settings interface and streamlined login processes for a smoother workflow.
+    - **Enhanced Speed**: Experience significantly quicker response times and overall performance.
+- 📦 **Bundled Stdio Server**: Includes `tabby-mcp-stdio` for a stable and efficient connection with VS Code.
+- 🖥️ **Terminal Control**: Empower AI to execute commands, read terminal output, and manage your sessions.
+- 🔍 **Session Management**: View and manage your SSH sessions directly from the plugin.
+- 🚫 **Command Abort**: Safely abort any running commands with ease.
+- 📋 **Buffer Access**: Retrieve terminal buffer content with flexible line range options.
+- 🔒 **Pair Programming Mode**: An optional safety feature that requires confirmation before AI executes commands, ensuring you maintain control.
+- 📊 **Command History**: Keep track of and review all previously executed commands.
+- 🔄 **Command Output Storage**: Access complete command outputs with convenient pagination.
 
 ## 🔧 Installation
 
 ### Install from Tabby Plugin Store
 
-1. Go to Tabby settings → Plugins → MCP
-2. Click "Install" on the Tabby MCP plugin
-3. Restart Tabby
-4. Configure your AI client to connect to the MCP server (see [Connecting to MCP](#-connecting-to-mcp))
-
-### Using Docker
-
-You can build and install the plugin using Docker with the following command:
-
-```bash
-git clone https://github.com/thuanpham582002/tabby-mcp-server.git
-cd tabby-mcp-server
-# Build the Docker image
-docker build -t tabby-mcp . && docker run -v $(pwd)/build:/output tabby-mcp
-bash scripts/copy_to_plugin_folder.sh
-```
-
-This command builds a Docker image tagged as 'tabby-mcp' and runs a container from this image, mounting your local 'build' directory to '/output' in the container. The script `scripts/copy_to_plugin_folder.sh` will copy the built files to the Tabby plugin folder.
+1.  Open Tabby settings and navigate to **Plugins → MCP**.
+2.  Locate and click "Install" on the **Tabby VSCode Agent** plugin.
+3.  Restart Tabby to finalise the installation.
+4.  Proceed to configure VS Code with the MCP Server as detailed below.
 
 ## 🚀 Quick Start
 
-1. Install the plugin using one of the methods above
-2. Start Tabby and navigate to Settings → Plugins → MCP
-3. Configure the MCP server port (default: 3001)
-4. Toggle "Start on Boot" to automatically start the server when Tabby launches
-5. Connect to the MCP server from any supported AI client listed at https://modelcontextprotocol.io/clients
+1.  Ensure the plugin is installed using one of the methods above.
+2.  Launch Tabby and go to **Settings → Copilot**.
+3.  Within the settings page, you'll find a collapsible **"Instructions"** section. This provides detailed, step-by-step guidance on how to integrate the agent with VS Code.
+4.  Configure the MCP server port (default: `3001`).
+5.  Toggle "Start on Boot" if you wish for the server to automatically launch with Tabby.
+6.  Connect your preferred AI client to the MCP server. A list of supported clients can be found at [https://modelcontextprotocol.io/clients](https://modelcontextprotocol.io/clients).
 
 ## 💻 Usage Examples
 
-### Connect an AI to Control Your Terminal
+### Connecting an AI to Control Your Terminal
 
-1. Start Tabby with the MCP plugin enabled
-2. Configure your AI client to connect to the MCP server (see [Connecting to MCP](#-connecting-to-mcp))
-3. Ask your AI assistant to run commands or manage your terminal sessions
+1.  Start Tabby with the Tabby VSCode Agent plugin enabled.
+2.  Configure your AI client to connect to the MCP server (refer to [Connecting to MCP](#-connecting-to-mcp) for details).
+3.  Instruct your AI assistant to run commands or manage your terminal sessions.
 
 Example AI prompt:
 ```
-Connect to my Tabby MCP server and list all available terminal sessions.
+Connect to my Tabby VSCode Agent and list all available terminal sessions.
 Then execute the command "ls -la" in the first available terminal.
 ```
 
 ## 🔗 Connecting to MCP
 
-To configure AI clients to use your MCP server, add the following to your `~/.cursor/mcp.json` file:
+### HTTP Server (Recommended for most clients)
 
-STDIO mode:
+To configure AI clients to use your MCP server, add the following to your `mcp.json` file:
+
 ```json
 {
-  "mcpServers": {
-    "Tabby MCP": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "tabby-mcp-stdio",
-        "--port",
-        "3001"
-      ]
-    }
-  }
+	"servers": {
+		"tabby": {
+			"url": "http://localhost:3001/sse",
+			"type": "http"
+		}
+	}
 }
 ```
 
-SSE mode:
-```json
-{
-  "mcpServers": {
-    "Tabby MCP": {
-      "type": "sse",
-      "url": "http://localhost:3001/sse"
-    }
-  }
-}
-```
+### Stdio Server (for VS Code)
 
-Select your preferred MCP server in your AI client settings. The Tabby MCP plugin must be running for the "Tabby MCP" (SSE) option to work, while the STDIO and Docker options will start their own server instances.
+For a more robust integration with VS Code, you can utilise the bundled `stdio` server.
 
-## ⚙️ Configuration in Tabby Setting
-
-Configure the MCP server through the Tabby settings:
+1.  Navigate to **Settings → Copilot** in Tabby.
+2.  Under the **Stdio Server** section, you will find the full path to the server script.
+3.  Click the "Copy" button to copy the path to your clipboard.
+4.  In your VS Code `mcp.json`, configure the server as shown below, pasting the copied path:
 
 ```json
 {
-  "mcp": {
-    "port": 3001,
-    "host": "http://localhost:3001",
-    "enableLogging": false,
-    "startOnBoot": true,
-    "pairProgrammingMode": {
-      "enabled": true,
-      "showConfirmationDialog": true,
-      "autoFocusTerminal": true
+    "servers": {
+        "tabby-stdio": {
+            "type": "stdio",
+            "command": "node",
+            "args": ["<PASTE THE COPIED PATH HERE>"]
+        }
     }
-  }
 }
 ```
 
 ### Pair Programming Mode
 
-The plugin includes a "Pair Programming Mode" that adds safety features when AI assistants control your terminal:
+The plugin includes a "Pair Programming Mode" to enhance safety when AI assistants control your terminal:
 
-- **Confirmation Dialog**: Prompt user before executing commands
-- **Auto Focus Terminal**: Automatically focus terminal when commands are executed
-- **Command Rejection**: Ability to reject commands with feedback
+-   **Confirmation Dialogue**: Prompts the user for confirmation before executing commands.
+-   **Auto Focus Terminal**: Automatically focuses the terminal when commands are executed.
+-   **Command Rejection**: Provides the ability to reject commands with feedback.
 
 To enable Pair Programming Mode:
 
-1. Go to Tabby settings → Plugins → MCP
-2. Toggle "Enable Pair Programming Mode"
-3. Configure additional safety options as needed
+1.  Go to Tabby settings → Copilot.
+2.  Toggle "Enable Pair Programming Mode".
+3.  Configure additional safety options as required.
 
 ## 📚 API Reference
 
@@ -168,6 +119,7 @@ To enable Pair Programming Mode:
 
 | Tool | Description | Parameters |
 |------|-------------|------------|
+| `open-vscode-chat` | Opens the VSCode chat window. | None |
 | `get_ssh_session_list` | Get list of all terminal sessions | None |
 | `exec_command` | Execute a command in terminal | `command`, `tabId`, `commandExplanation` |
 | `get_terminal_buffer` | Get terminal content | `tabId`, `startLine`, `endLine` |
@@ -175,43 +127,43 @@ To enable Pair Programming Mode:
 
 ## 🤝 Contributing
 
-Contributions are welcome! Here's how you can help:
+Contributions are highly encouraged! Here's how you can contribute to the Tabby VSCode Agent:
 
-1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/your-feature`)
-3. Commit your changes (`git commit -m 'Add your feature'`)
-4. Push to the branch (`git push origin feature/your-feature`)
-5. Open a Pull Request
+1.  Fork the repository.
+2.  Create a new feature branch (`git checkout -b feature/your-feature`).
+3.  Commit your changes (`git commit -m 'Add your feature'`).
+4.  Push your branch to the origin (`git push origin feature/your-feature`).
+5.  Open a Pull Request.
 
-See the [contributing guidelines](CONTRIBUTING.md) for more details.
+Please refer to the [contributing guidelines](CONTRIBUTING.md) for more detailed information.
 
 ### Development Workflow
 
-1. Clone the repository and install dependencies:
-   ```bash
-   git clone https://github.com/thuanpham582002/tabby-mcp-server.git
-   cd tabby-mcp-server
-   npm install
-   ```
+1.  Clone the repository and install dependencies:
+    ```bash
+    git clone https://github.com/SteffMet/tabby-vscode-agent.git
+    cd tabby-vscode-agent
+    npm install
+    ```
 
-2. Make your changes to the codebase
+2.  Make your desired changes to the codebase.
 
-3. Build the plugin:
-   ```bash
-   docker build -t tabby-mcp . && docker run -v $(pwd)/build:/output tabby-mcp
-   ```
+3.  Build the plugin:
+    ```bash
+    npm run build
+    ```
 
-4. Test the plugin with Tabby:
-   ```bash
-   bash scripts/copy_to_plugin_folder.sh
-   ```
+4.  Test the plugin with Tabby:
+    ```bash
+    npm run deploy
+    ```
 
-## 📝 License
+## 📝 Licence
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+This project is licensed under the MIT Licence - see the [LICENCE](LICENCE) file for details.
 
 ---
 
 <p align="center">
-  Made with ❤️ by <a href="https://github.com/thuanpham582002">Pham Tien Thuan</a>
+  Made with ❤️ by <a href="https://github.com/SteffMet">SteffMet</a>
 </p>

@@ -5,6 +5,7 @@ import TabbyCoreModule, { AppService, ConfigProvider, ConfigService, ToolbarButt
 import { McpService } from './services/mcpService';
 import { McpLoggerService } from './services/mcpLogger.service';
 import { ExecToolCategory } from './tools/terminal';
+import { VSCodeToolCategory } from './tools/vscode-tool-category';
 import { ExecCommandButtonComponent } from './components/execCommandButton.component';
 import { MinimizedDialogsModalComponent } from './components/minimizedModal.component';
 import { CommandHistoryModalComponent } from './components/commandHistoryModal.component';
@@ -45,6 +46,7 @@ import './styles.scss';
     McpService,
     McpLoggerService,
     ExecToolCategory,
+    VSCodeToolCategory,
     DialogService,
     DialogManagerService,
     MinimizedDialogManagerService,

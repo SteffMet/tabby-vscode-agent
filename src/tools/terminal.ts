@@ -15,7 +15,8 @@ import {
   SshSessionListTool,
   ExecCommandTool,
   GetTerminalBufferTool,
-  GetCommandOutputTool
+  GetCommandOutputTool,
+  OpenCopilotTool
 } from './terminal/';
 
 /**
@@ -102,12 +103,14 @@ export class ExecToolCategory extends BaseToolCategory {
     );
     const getTerminalBufferTool = new GetTerminalBufferTool(this, this.logger);
     const getCommandOutputTool = new GetCommandOutputTool(this.logger, commandOutputStorage);
+    const openCopilotTool = new OpenCopilotTool(this.app, this.logger);
 
     // Register tools
     this.registerTool(sshSessionListTool.getTool());
     this.registerTool(execCommandTool.getTool());
     this.registerTool(getTerminalBufferTool.getTool());
     this.registerTool(getCommandOutputTool.getTool());
+    this.registerTool(openCopilotTool.getTool());
   }
 
   /**

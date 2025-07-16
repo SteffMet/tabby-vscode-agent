@@ -9,7 +9,7 @@ import { MinimizedDialogManagerService } from '../services/minimizedDialogManage
  * Dialog component for confirming command execution
  */
 @Component({
-  templateUrl: './confirmCommandDialog.component.pug'
+  template: require('./confirmCommandDialog.component.pug').default,
 })
 export class ConfirmCommandDialogComponent implements AfterViewInit, OnDestroy {
   @Input() command: string;

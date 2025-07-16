@@ -2,6 +2,7 @@ import { Injectable } from '@angular/core';
 
 import { ExecToolCategory } from '../tools/terminal';
 import { ToolCategory } from '../type/types';
+import { VSCodeToolCategory } from '../tools/vscode-tool-category';
 
 import express, { Request, Response } from "express";
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
@@ -29,6 +30,7 @@ export class McpService {
   constructor(
     public config: ConfigService,
     private execToolCategory: ExecToolCategory,
+    private vscodeToolCategory: VSCodeToolCategory,
     private logger: McpLoggerService
   ) {
     // Initialize MCP Server
@@ -40,6 +42,7 @@ export class McpService {
     // Register tool categories
     // this.registerToolCategory(this.tabToolCategory);
     this.registerToolCategory(this.execToolCategory);
+    this.registerToolCategory(this.vscodeToolCategory);
     
     // Configure Express
     this.configureExpress();

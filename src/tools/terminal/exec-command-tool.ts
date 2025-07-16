@@ -196,13 +196,13 @@ export class ExecCommandTool extends BaseTool {
       // Check if command contains newlines (multiple commands)
       if (command.includes('\n')) {
         // Send the command with typing simulation
-        session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo; {
+        session.tab.sendInput(`read ds;eval "$ds";read ss;eval "$ss"; {
 echo "${startMarker}"
 ${trimmedCommand}
 }\n`);
       } else {
         // For single-line commands, use the simpler approach with proper semicolons
-        session.tab.sendInput(`stty -echo;read ds;eval "$ds";read ss;eval "$ss";stty echo;echo "${startMarker}";\\
+        session.tab.sendInput(`read ds;eval "$ds";read ss;eval "$ss";echo "${startMarker}";\\
 ${trimmedCommand}\n`);
       }
 

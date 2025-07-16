@@ -9,7 +9,7 @@ import { MinimizedDialogManagerService } from '../services/minimizedDialogManage
  * Dialog component for displaying command execution results
  */
 @Component({
-  templateUrl: './commandResultDialog.component.pug'
+  template: require('./commandResultDialog.component.pug').default,
 })
 export class CommandResultDialogComponent implements AfterViewInit, OnDestroy {
   @Input() command: string;

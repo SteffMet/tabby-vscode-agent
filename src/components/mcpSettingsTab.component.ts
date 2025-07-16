@@ -2,18 +2,69 @@ import { Component, HostBinding, OnInit } from '@angular/core';
 import { ConfigService } from 'tabby-core';
 import { McpService } from '../services/mcpService';
 import { McpLoggerService } from '../services/mcpLogger.service';
+import * as path from 'path';
+import * as os from 'os';
 
 /** @hidden */
 @Component({
-    templateUrl: './mcpSettingsTab.component.pug',
+    template: require('./mcpSettingsTab.component.pug').default,
+    styles: [require('./mcpSettingsTab.component.scss')],
 })
 export class McpSettingsTabComponent implements OnInit {
-    @HostBinding('class.content-box') true
+    isLightMode = false;
+    toggleTheme(): void {
+        this.isLightMode = !this.isLightMode;
+        const root = document.querySelector('body');
+        if (root) {
+            if (this.isLightMode) {
+                root.classList.add('light-mode');
+            } else {
+                root.classList.remove('light-mode');
+            }
+        }
+    }
+    @HostBinding('class.content-box') true;
     isServerRunning = false;
     serverUrl: string = 'http://localhost:3001';
     port: number = 3001;
     enableDebugLogging: boolean = false;
     startOnBoot: boolean = true;
+    instructionsVisible = false;
+    stdioServerPath: string;
+    vscodeSettingsJson = `
+"mcp.servers": {
+  "tabby": {
+    "url": "http://localhost:3001/sse",
+    "type": "http"
+  }
+}`;
+
+    stdioSettingsJson = `
+{
+    "servers": {
+        "tabby": {
+            "type": "stdio",
+            "command": "npx",
+            "args": [
+                "tabby-mcp-stdio"
+            ]
+        }
+    },
+    "inputs": []
+}`;
+
+    copyConfigJson(type: string): void {
+        let configText = '';
+        if (type === 'http') {
+            configText = this.vscodeSettingsJson.trim();
+        } else if (type === 'stdio') {
+            configText = this.stdioSettingsJson.trim();
+        }
+        if (configText) {
+            navigator.clipboard.writeText(configText);
+            this.logger.info(`Copied ${type} MCP config to clipboard`);
+        }
+    }
 
     // Pair Programming Mode settings
     pairProgrammingEnabled: boolean = false;
@@ -48,6 +99,8 @@ export class McpSettingsTabComponent implements OnInit {
             startOnBoot: this.startOnBoot,
             configStore: this.config.store.mcp
         });
+
+        this.setStdioServerPath();
     }
 
     private initializeConfig(): void {
@@ -123,7 +176,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Saving server URL: ${this.serverUrl}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             this.config.store.mcp.serverUrl = this.serverUrl;
             this.config.save();
@@ -137,7 +202,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Saving port: ${this.port}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             this.config.store.mcp.port = this.port;
             this.config.save();
@@ -184,7 +261,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Toggling debug logging to: ${this.enableDebugLogging}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             this.config.store.mcp.enableDebugLogging = this.enableDebugLogging;
             this.config.save();
@@ -199,7 +288,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Toggling start on boot to: ${this.startOnBoot}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             this.config.store.mcp.startOnBoot = this.startOnBoot;
             this.config.save();
@@ -213,7 +314,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Toggling Pair Programming Mode to: ${this.pairProgrammingEnabled}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             if (!this.config.store.mcp.pairProgrammingMode) {
                 this.config.store.mcp.pairProgrammingMode = {};
@@ -230,7 +343,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Toggling Auto Focus Terminal to: ${this.autoFocusTerminal}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             if (!this.config.store.mcp.pairProgrammingMode) {
                 this.config.store.mcp.pairProgrammingMode = {};
@@ -247,7 +372,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Toggling Show Confirmation Dialog to: ${this.showConfirmationDialog}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             if (!this.config.store.mcp.pairProgrammingMode) {
                 this.config.store.mcp.pairProgrammingMode = {};
@@ -264,7 +401,19 @@ export class McpSettingsTabComponent implements OnInit {
         console.log(`Toggling Show Result Dialog to: ${this.showResultDialog}`);
         try {
             if (!this.config.store.mcp) {
-                this.config.store.mcp = {};
+                this.config.store.mcp = {
+                    startOnBoot: true,
+                    enabled: true,
+                    port: 3001,
+                    serverUrl: 'http://localhost:3001',
+                    enableDebugLogging: false,
+                    pairProgrammingMode: {
+                        enabled: false,
+                        autoFocusTerminal: true,
+                        showConfirmationDialog: true,
+                        showResultDialog: true
+                    }
+                };
             }
             if (!this.config.store.mcp.pairProgrammingMode) {
                 this.config.store.mcp.pairProgrammingMode = {};
@@ -274,6 +423,22 @@ export class McpSettingsTabComponent implements OnInit {
             this.logger.info(`Show Result Dialog ${this.showResultDialog ? 'enabled' : 'disabled'}`);
         } catch (error) {
             console.error('Error toggling Show Result Dialog:', error);
+        }
+    }
+
+    toggleInstructions(): void {
+        this.instructionsVisible = !this.instructionsVisible;
+    }
+
+    private setStdioServerPath(): void {
+        const pluginDir = path.join(os.homedir(), 'AppData', 'Roaming', 'tabby', 'plugins', 'node_modules', 'tabby-vscode-agent');
+        this.stdioServerPath = path.join(pluginDir, 'node_modules', 'tabby-mcp-stdio', 'mcp-server-standalone.js');
+    }
+
+    copyStdioPath(): void {
+        if (this.stdioServerPath) {
+            navigator.clipboard.writeText(this.stdioServerPath);
+            this.logger.info('Copied stdio server path to clipboard');
         }
     }
 }

@@ -1,5 +1,6 @@
 import { Injectable } from '@angular/core';
-import { HotkeyDescription, HotkeyProvider } from 'tabby-core';
+import { HotkeyProvider } from 'tabby-core';
+import type { HotkeyDescription } from 'tabby-core';
 
 /** @hidden */
 @Injectable()
@@ -17,6 +18,10 @@ export class McpHotkeyProvider extends HotkeyProvider {
             {
                 id: 'mcp-show-running-commands',
                 name: 'Show running MCP commands',
+            },
+            {
+                id: 'mcp-open-copilot',
+                name: 'Open Copilot window',
             },
         ];
     }

@@ -139,5 +139,7 @@ dist
 mcp_llm.txt
 package-lock.json
 build-and-copy.sh
-typings
 build/
+example-ignore/
+plugins/
+tabby-mcp-server/

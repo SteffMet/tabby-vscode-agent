@@ -1,3 +1,4 @@
+import * as z from 'zod';
 import { createJsonResponse } from '../../type/types';
 import { BaseTool } from './base-tool';
 import { ExecToolCategory } from '../terminal';
@@ -48,7 +49,7 @@ EXAMPLE USAGE:
 NOTES:
 - If no terminal sessions are available, an empty array will be returned
 - Always check for available sessions before executing commands`,
-      schema: undefined,
+      schema: {},
       handler: async (_, extra) => {
         const serializedSessions = this.execToolCategory.findAndSerializeTerminalSessions().map(session => ({
           id: session.id,

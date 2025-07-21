@@ -2,19 +2,21 @@
   .settings-header
     h1.tabby-header
       i.bi.bi-gear-wide-connected.mr-2
-      | Copilot VSCode Agent
-    .github-profile-link
-      a(href='https://github.com/steffmet', target='_blank', rel='noopener', title='Visit SteffMet on GitHub')
-        button.btn.btn-secondary.github-btn
-          i.fab.fa-github.mr-1
-          span View GitHub
+      | 🚀 Copilot VSCode Agent ⚙️
+    .links-container
+      button.btn.btn-secondary.github-btn((click)="openGitHub()")
+        i.fab.fa-github.mr-1
+        span View GitHub
+      button.btn.btn-secondary.vscode-btn((click)="openVSCodeExtension()")
+        i.fab.fa-vscode.mr-1
+        span VSCode Extension
 
   .settings-columns
     .settings-left
       .header
         .title
           i.bi.bi-gear-wide-connected.mr-2
-          | Copilot VSCode Agent
+          | 🚀 Copilot VSCode Agent ⚙️
         .description Configure settings for the Copilot integration
       //- Copilot Settings Section
       .form-group

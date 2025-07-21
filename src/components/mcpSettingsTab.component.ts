@@ -2,6 +2,7 @@ import { Component, HostBinding, OnInit } from '@angular/core';
 import { ConfigService } from 'tabby-core';
 import { McpService } from '../services/mcpService';
 import { McpLoggerService } from '../services/mcpLogger.service';
+import { UrlOpeningService } from '../services/urlOpening.service';
 import * as path from 'path';
 import * as os from 'os';
 
@@ -75,7 +76,8 @@ export class McpSettingsTabComponent implements OnInit {
     constructor(
         public config: ConfigService,
         private mcpService: McpService,
-        private logger: McpLoggerService
+        private logger: McpLoggerService,
+        private urlOpeningService: UrlOpeningService
     ) {
         console.log('McpSettingsTabComponent constructor');
     }
@@ -424,6 +426,14 @@ export class McpSettingsTabComponent implements OnInit {
         } catch (error) {
             console.error('Error toggling Show Result Dialog:', error);
         }
+    }
+
+    openGitHub(): void {
+        this.urlOpeningService.openUrl('https://github.com/steffmet');
+    }
+
+    openVSCodeExtension(): void {
+        this.urlOpeningService.openUrl('https://marketplace.visualstudio.com/items?itemName=TabbyCopilotConnector.tabby-copilot-opener');
     }
 
     toggleInstructions(): void {

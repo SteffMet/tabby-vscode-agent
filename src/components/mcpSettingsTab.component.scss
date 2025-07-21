@@ -80,6 +80,13 @@ settings-tab-body, [_nghost-qqi-c80] {
   border-bottom: 1px solid var(--border-primary);
   text-align: center;
 
+  .links-container {
+    display: flex;
+    justify-content: center;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
   .tabby-header {
     font-size: 2.25rem;
     font-weight: 700;
@@ -87,6 +94,27 @@ settings-tab-body, [_nghost-qqi-c80] {
     letter-spacing: 1px;
     text-shadow: 1px 1px 4px var(--shadow-color);
   }
+}
+
+.vscode-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1.1rem;
+  font-weight: 600;
+  background-color: var(--bg-tertiary);
+  color: var(--text-accent);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+  padding: 0.5rem 1.2rem;
+  box-shadow: 0 2px 8px var(--shadow-color);
+  transition: background 0.2s, color 0.2s, box-shadow 0.2s;
+}
+
+.vscode-btn:hover {
+  background-color: var(--border-secondary);
+  color: #fff;
+  box-shadow: 0 4px 16px var(--shadow-color);
 }
 
 // 4. Two-Column Layout

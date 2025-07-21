@@ -1,0 +1,23 @@
+.modal-header
+  h4.modal-title
+    i.fas.fa-puzzle-piece.me-2
+    | Extension Recommendation
+  button.btn-close((click)="dismiss()")
+
+.modal-body
+  p
+    | For a more seamless experience, we recommend installing the 
+    strong Tabby Copilot Opener
+    |  extension from the VS Code Marketplace.
+  
+  .d-flex.justify-content-center.my-3
+    button.btn.btn-primary.btn-lg((click)="openMarketplace()")
+      i.fas.fa-store.me-2
+      | View in Marketplace
+
+  small.text-muted
+    | This extension allows Tabby to directly communicate with VS Code, enabling faster and more reliable opening of the Copilot window.
+
+.modal-footer
+  button.btn.btn-secondary((click)="dismiss()")
+    | Dismiss

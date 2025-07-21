@@ -1,6 +1,22 @@
 # Changelog
 
-## [1.0.7] - 16/07/2025 
+## [1.0.8] - 21-07-2025
+
+### Changed
+- Refactored URL opening to use a silent PowerShell command via the terminal service, fixing runtime errors.
+- Both the GitHub and VSCode Extension links in settings now open silently.
+
+### Added
+- "VSCode Extension" button in the settings tab to open the marketplace page.
+
+## [1.0.7] - 21-07-2025
+
+# Added
+- VSCode Extension Support, listens to http port. 
+- Fixed URL Opening links
+- Increased speed of reading SSH sessions
+- Fixed issue with opening VSCode via non extension
+- Fixed UI for Command History
 
 ### Added
 - Pair Programming Mode with confirmation dialog

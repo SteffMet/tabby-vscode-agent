@@ -5,7 +5,9 @@ import { ExecToolCategory } from '../tools/terminal';
 import { McpLoggerService } from './mcpLogger.service';
 import { CommandHistoryModalComponent } from '../components/commandHistoryModal.component';
 import { RunningCommandsDialogComponent } from '../components/runningCommandsDialog.component';
+import { ExtensionRecommendationDialogComponent } from '../components/extensionRecommendationDialog.component';
 import { exec } from 'child_process';
+import * as net from 'net';
 
 /**
  * Service for handling MCP-related hotkeys
@@ -109,16 +111,47 @@ export class McpHotkeyService {
    */
   public openCopilot(): void {
     try {
-      this.logger.info('Opening Copilot window via hotkey');
-      exec('pwsh.exe -Command "code --command workbench.action.chat.openInNewWindow"', (error, stdout, stderr) => {
-        if (error) {
-          this.logger.error('Error running VS Code Copilot command:', error);
-        } else {
-          this.logger.info('VS Code Copilot command executed:', stdout);
-        }
-      });
+      this.logger.info('Attempting to open Copilot window');
+      this.openCopilotViaTCP();
     } catch (error) {
       this.logger.error('Error opening Copilot window:', error);
     }
+  }
+
+  private openCopilotViaTCP(): void {
+    const port = 6789;
+    const host = '127.0.0.1';
+    const client = new net.Socket();
+
+    this.logger.info(`Attempting to connect to VS Code extension on port ${port}`);
+
+    client.connect(port, host, () => {
+      this.logger.info('Successfully connected to VS Code extension. Requesting to open Copilot.');
+      client.end();
+    });
+
+    client.on('error', (err) => {
+      this.logger.warn('Failed to connect to VS Code extension via TCP, falling back to PowerShell.', err.message);
+      this.openCopilotWithPowerShell();
+    });
+  }
+
+  private openCopilotWithPowerShell(): void {
+    this.logger.info('Opening Copilot window via PowerShell');
+    
+    // Show recommendation dialog
+    this.modal.open(ExtensionRecommendationDialogComponent, {
+      size: 'md',
+      backdrop: true,
+      keyboard: true
+    });
+
+    exec('pwsh.exe -Command "code --command workbench.action.chat.openInNewWindow"', (error, stdout, stderr) => {
+      if (error) {
+        this.logger.error('Error running VS Code Copilot command:', error);
+      } else {
+        this.logger.info(`VS Code Copilot command executed: ${stdout}`);
+      }
+    });
   }
 }

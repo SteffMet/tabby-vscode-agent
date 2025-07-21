@@ -2,10 +2,16 @@
 
 > The Tabby VSCode Agent is an advanced plugin for [Tabby Terminal](https://github.com/Eugeny/tabby), designed to seamlessly integrate AI-powered terminal control and automation directly within VS Code. Building upon the foundations of the original [Tabby MCP Server](https://github.com/thuanpham582002/tabby-mcp-server), this improved version offers enhanced functionality, quicker speeds, and a more refined user experience tailored for VS Code users.
 
-## 🆕 What's New in 0.0.3 (2025-07-16)
+## 🆕 What's New in 1.0.8 (21-07-2025)
 
 ### Added
+- VSCode Extension Support, listens to http port. 
+- Fixed URL Opening links
+- Increased speed of reading SSH sessions
+- Fixed issue with opening VSCode via non extension
+- Fixed UI for Command History
 - Enhanced support for VS Code integration
+- Added support for VSCode Extension
 - Copilot agent chat can now be opened directly from the navbar
 - New and improved UI elements for a more modern look
 - Updated and fixed navbar for better navigation and stability

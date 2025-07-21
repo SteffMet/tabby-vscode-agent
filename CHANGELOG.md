@@ -1,6 +1,6 @@
 # Changelog
 
-## [1.0.7] - 16/07/2025 - Initial publish/release
+## [1.0.7] - 16/07/2025 
 
 ### Added
 - Pair Programming Mode with confirmation dialog

@@ -1,0 +1,58 @@
+// Import base variables for consistency
+@use './mcpSettingsTab.component.scss';
+
+:host {
+  --bg-primary: #1a1d21;
+  --bg-secondary: #2c3038;
+  --text-primary: #e6e6e6;
+  --text-accent: #61afef;
+  --border-primary: #3a3f4b;
+}
+
+.modal-header {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-primary);
+
+  .modal-title {
+    color: var(--text-accent);
+    font-weight: 600;
+  }
+
+  .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+  }
+}
+
+.modal-body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  text-align: center;
+  padding: 2rem;
+}
+
+.modal-footer {
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+  justify-content: center;
+}
+
+.btn-primary {
+  background-color: var(--text-accent);
+  color: var(--bg-primary);
+  font-weight: 600;
+  
+  &:hover {
+    filter: brightness(1.1);
+  }
+}
+
+.btn-secondary {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+
+  &:hover {
+    background-color: var(--border-secondary);
+  }
+}

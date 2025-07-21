@@ -25,6 +25,8 @@ import { RunningCommandsManagerService } from './services/runningCommandsManager
 import { RunningCommandsDialogComponent } from './components/runningCommandsDialog.component';
 import { McpHotkeyService } from './services/mcpHotkey.service';
 import { McpHotkeyProvider } from './services/mcpHotkeyProvider.service';
+import { ExtensionRecommendationDialogComponent } from './components/extensionRecommendationDialog.component';
+import { UrlOpeningService } from './services/urlOpening.service';
 
 // Import global styles
 import './styles.scss';
@@ -53,6 +55,7 @@ import './styles.scss';
     CommandHistoryManagerService,
     RunningCommandsManagerService,
     McpHotkeyService,
+    UrlOpeningService,
     { provide: ToolbarButtonProvider, useClass: McpToolbarButtonProvider, multi: true },
     { provide: SettingsTabProvider, useClass: McpSettingsTabProvider, multi: true },
     { provide: ConfigProvider, useClass: McpConfigProvider, multi: true },
@@ -63,14 +66,16 @@ import './styles.scss';
     MinimizedDialogsModalComponent,
     CommandHistoryModalComponent,
     RunningCommandsDialogComponent,
-    McpSettingsTabComponent
+    McpSettingsTabComponent,
+    ExtensionRecommendationDialogComponent
   ],
   entryComponents: [
     ExecCommandButtonComponent,
     MinimizedDialogsModalComponent,
     CommandHistoryModalComponent,
     RunningCommandsDialogComponent,
-    McpSettingsTabComponent
+    McpSettingsTabComponent,
+    ExtensionRecommendationDialogComponent
   ],
   exports: [
     ExecCommandButtonComponent

@@ -33,6 +33,7 @@ export default {
               },
             },
           },
+          'angular2-template-loader',
         ],
         exclude: /node_modules/,
       },
@@ -69,6 +70,7 @@ export default {
     'tabby-terminal': 'commonjs2 tabby-terminal',
     rxjs: 'commonjs2 rxjs',
     'rxjs/operators': 'commonjs2 rxjs/operators',
+    vscode: 'commonjs2 vscode',
   },
   devtool: 'source-map',
   target: 'node'

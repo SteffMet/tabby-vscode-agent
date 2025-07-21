@@ -11,8 +11,8 @@ const readmePath = path.join(projectDir, 'README.md');
 const changelogPath = path.join(projectDir, 'CHANGELOG.md');
 
 // New Target plugin directory
-const pluginDir = path.join(os.homedir(), 'AppData', 'Roaming', 'tabby', 'plugins', 'node_modules', 'tabby-vscode');
-const pluginDistDir = path.join(pluginDir, 'dist');
+const pluginDir = path.join(os.homedir(), 'AppData', 'Roaming', 'tabby', 'plugins', 'node_modules', 'tabby-copilot');
+const pluginDistDir = path.join(pluginDir, 'plugins', 'dist');
 
 // Helper function to copy files/directories
 function copyRecursive(src, dest) {

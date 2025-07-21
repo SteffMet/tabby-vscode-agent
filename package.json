@@ -1,7 +1,7 @@
 {
   "name": "tabby-vscode-agent",
-  "version": "1.0.7",
-  "description": "Copilot Intergration for Tabby",
+  "version": "1.0.8",
+  "description": "Seamlessly integrate AI-powered terminal control and automation within VS Code. Ask AI for your Terminal Prompts",
   "homepage": "https://github.com/SteffMet/tabby-vscode-agent",
   "keywords": [
     "tabby-plugin",

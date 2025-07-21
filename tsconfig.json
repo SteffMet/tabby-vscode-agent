@@ -15,6 +15,17 @@
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
     "baseUrl": "src",
+    "paths": {
+      "tabby-core": ["../node_modules/tabby-core"],
+      "tabby-settings": ["../node_modules/tabby-settings"],
+      "tabby-terminal": ["../node_modules/tabby-terminal"],
+      "@angular/core": ["../node_modules/@angular/core"],
+      "@angular/common": ["../node_modules/@angular/common"],
+      "@angular/forms": ["../node_modules/@angular/forms"],
+      "@ng-bootstrap/ng-bootstrap": ["../node_modules/@ng-bootstrap/ng-bootstrap"],
+      "rxjs": ["../node_modules/rxjs"],
+      "rxjs/operators": ["../node_modules/rxjs/operators"]
+    },
     "sourceMap": true,
     "typeRoots": ["node_modules/@types"],
     "resolveJsonModule": true,

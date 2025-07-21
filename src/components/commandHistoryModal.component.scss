@@ -1,0 +1,213 @@
+// 1. Base Variables from mcpSettingsTab.component.scss
+:host {
+  --bg-primary: #1a1d21;
+  --bg-secondary: #2c3038;
+  --bg-tertiary: #24272c;
+  --text-primary: #e6e6e6;
+  --text-secondary: #b3b3b3;
+  --text-accent: #61afef;
+  --border-primary: #3a3f4b;
+  --border-secondary: #505663;
+  --shadow-color: rgba(0, 0, 0, 0.3);
+  --success-color: #98c379;
+  --danger-color: #e06c75;
+  --warning-color: #e5c07b; // From Atom One Dark
+  --info-color: #56b6c2;
+}
+
+.modal-header {
+  background-color: var(--bg-secondary);
+  color: var(--text-primary);
+  border-bottom: 1px solid var(--border-primary);
+
+  .modal-title {
+    font-weight: 600;
+    color: var(--text-accent);
+  }
+
+  .btn-close {
+    filter: invert(1) grayscale(100%) brightness(200%);
+  }
+}
+
+.modal-body {
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  max-height: 70vh;
+  overflow-y: auto;
+}
+
+.modal-footer {
+  background-color: var(--bg-secondary);
+  border-top: 1px solid var(--border-primary);
+}
+
+// Search and Filter
+.input-group-text {
+  background-color: var(--bg-tertiary);
+  border: 1px solid var(--border-secondary);
+  color: var(--text-secondary);
+}
+
+.form-control, .form-select {
+  background-color: var(--bg-tertiary);
+  color: var(--text-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 8px;
+
+  &:focus {
+    border-color: var(--text-accent);
+    box-shadow: 0 0 0 3px rgba(97, 175, 239, 0.2);
+    outline: none;
+    background-color: var(--bg-tertiary); // Keep bg color on focus
+  }
+}
+
+// History List
+.history-list {
+  max-height: 60vh;
+  overflow-y: auto;
+}
+
+.history-entry {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  box-shadow: 0 4px 12px var(--shadow-color);
+  transition: all 0.2s ease-in-out;
+
+  &:hover {
+    border-color: var(--text-accent);
+    transform: translateY(-2px);
+  }
+}
+
+// Command and Output sections
+.command-section {
+  strong {
+    color: var(--text-accent);
+  }
+  code {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-primary) !important;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    font-size: 0.9rem;
+    word-break: break-all;
+  }
+}
+
+.output-section {
+  strong {
+    color: var(--info-color);
+  }
+  pre.output-text {
+    background-color: var(--bg-primary) !important;
+    color: var(--text-secondary) !important;
+    border: 1px solid var(--border-primary);
+    border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
+    font-size: 0.85rem;
+  }
+}
+
+// Badges
+.badge {
+  font-weight: 600;
+  font-size: 0.75rem;
+  &.bg-success {
+    background-color: var(--success-color) !important;
+    color: var(--bg-primary) !important;
+  }
+  &.bg-danger {
+    background-color: var(--danger-color) !important;
+    color: var(--bg-primary) !important;
+  }
+  &.bg-warning {
+    background-color: var(--warning-color) !important;
+    color: var(--bg-primary) !important;
+  }
+}
+
+// Buttons
+.btn {
+  border: none;
+  border-radius: 8px;
+  padding: 0.6rem 1.2rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease-in-out;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+
+  &.btn-outline-primary, &.btn-outline-secondary, &.btn-outline-danger, &.btn-outline-success {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-secondary);
+
+    &:hover {
+      background-color: var(--border-secondary);
+      border-color: var(--text-accent);
+    }
+  }
+  
+  &.btn-secondary {
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    border: 1px solid var(--border-secondary);
+
+    &:hover {
+      background-color: var(--border-secondary);
+    }
+  }
+}
+
+// Empty State
+.text-center.text-muted {
+  color: var(--text-secondary) !important;
+  .fas {
+    color: var(--text-secondary);
+  }
+}
+
+// Scrollbar
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-primary);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-accent);
+}
+
+// Dropdown
+.dropdown-menu {
+  background-color: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  box-shadow: 0 4px 8px var(--shadow-color);
+  border-radius: 0.5rem;
+  min-width: 320px;
+}
+.dropdown-header {
+  font-weight: 600;
+  color: var(--text-accent);
+  background-color: var(--bg-tertiary);
+}
+.dropdown-item {
+  color: var(--text-primary);
+  &:hover {
+    background-color: var(--bg-tertiary);
+    color: var(--text-accent);
+  }
+}
+.dropdown-divider {
+  border-top: 1px solid var(--border-primary);
+}
